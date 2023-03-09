@@ -219,7 +219,7 @@ protected:
     u32_t inferFieldIdxFromByteOffset(const llvm::GEPOperator* gepOp, DataLayout *dl, LocationSet& ls, s32_t idx);
 
     /// Compute offset of a gep instruction or gep constant expression
-    bool computeGepOffset(const User *V, LocationSet& ls);
+    bool computeGepOffset(const User *V, LocationSet& ls, bool& vGep);
 
     /// Get the base value of (i8* src and i8* dst) for external argument (e.g. memcpy(i8* dst, i8* src, int size))
     const Value* getBaseValueForExtArg(const Value* V);
@@ -378,15 +378,15 @@ protected:
             setCurrentBBAndValueForPAGEdge(edge);
     }
     /// Add Gep edge
-    inline void addGepEdge(NodeID src, NodeID dst, const LocationSet& ls, bool constGep)
+    inline void addGepEdge(NodeID src, NodeID dst, const LocationSet& ls, bool constGep, bool vGep)
     {
-        if(GepStmt *edge = pag->addGepStmt(src, dst, ls, constGep))
+        if(GepStmt *edge = pag->addGepStmt(src, dst, ls, constGep, vGep))
             setCurrentBBAndValueForPAGEdge(edge);
     }
     /// Add Offset(Gep) edge
-    inline void addNormalGepEdge(NodeID src, NodeID dst, const LocationSet& ls)
+    inline void addNormalGepEdge(NodeID src, NodeID dst, const LocationSet& ls, bool vGep)
     {
-        if(GepStmt *edge = pag->addNormalGepStmt(src, dst, ls))
+        if(GepStmt *edge = pag->addNormalGepStmt(src, dst, ls, vGep))
             setCurrentBBAndValueForPAGEdge(edge);
     }
     /// Add Variant(Gep) edge

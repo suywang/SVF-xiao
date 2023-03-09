@@ -121,7 +121,7 @@ void ConstraintGraph::buildCG()
         if(edge->isVariantFieldGep())
             addVariantGepCGEdge(edge->getRHSVarID(),edge->getLHSVarID());
         else
-            addNormalGepCGEdge(edge->getRHSVarID(),edge->getLHSVarID(),edge->getLocationSet());
+            addNormalGepCGEdge(edge->getRHSVarID(),edge->getLHSVarID(),edge->getLocationSet(), edge->isVGep());
     }
 
     SVFStmt::SVFStmtSetTy& loads = getPAGEdgeSet(SVFStmt::Load);
@@ -210,7 +210,7 @@ CopyCGEdge* ConstraintGraph::addCopyCGEdge(NodeID src, NodeID dst)
 /*!
  * Add Gep edge
  */
-NormalGepCGEdge*  ConstraintGraph::addNormalGepCGEdge(NodeID src, NodeID dst, const LocationSet& ls)
+NormalGepCGEdge*  ConstraintGraph::addNormalGepCGEdge(NodeID src, NodeID dst, const LocationSet& ls, bool vGep)
 {
     ConstraintNode* srcNode = getConstraintNode(src);
     ConstraintNode* dstNode = getConstraintNode(dst);
@@ -225,6 +225,7 @@ NormalGepCGEdge*  ConstraintGraph::addNormalGepCGEdge(NodeID src, NodeID dst, co
 
     srcNode->addOutgoingGepEdge(edge);
     dstNode->addIncomingGepEdge(edge);
+    if(vGep) edge->setVGep();
     return edge;
 }
 
@@ -322,7 +323,7 @@ void ConstraintGraph::reTargetDstOfEdge(ConstraintEdge* edge, ConstraintNode* ne
     {
         const LocationSet ls = gep->getLocationSet();
         removeDirectEdge(gep);
-        addNormalGepCGEdge(srcId,newDstNodeID,ls);
+        addNormalGepCGEdge(srcId,newDstNodeID,ls, gep->isVGep());
     }
     else if(VariantGepCGEdge* gep = SVFUtil::dyn_cast<VariantGepCGEdge>(edge))
     {
@@ -366,7 +367,7 @@ void ConstraintGraph::reTargetSrcOfEdge(ConstraintEdge* edge, ConstraintNode* ne
     {
         const LocationSet ls = gep->getLocationSet();
         removeDirectEdge(gep);
-        addNormalGepCGEdge(newSrcNodeID,dstId,ls);
+        addNormalGepCGEdge(newSrcNodeID,dstId,ls, gep->isVGep());
     }
     else if(VariantGepCGEdge* gep = SVFUtil::dyn_cast<VariantGepCGEdge>(edge))
     {

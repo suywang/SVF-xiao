@@ -270,6 +270,7 @@ private:
     void operator=(const NormalGepCGEdge &); ///< place holder
 
     LocationSet ls;	///< location set of the gep edge
+    bool vGep{false};
 
 public:
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
@@ -307,6 +308,14 @@ public:
     inline s32_t getConstantFieldIdx() const
     {
         return ls.getConstantFieldIdx();
+    }
+
+    inline bool isVGep() const {
+        return vGep;
+    }
+
+    inline void setVGep() {
+        vGep = true;
     }
 
 };

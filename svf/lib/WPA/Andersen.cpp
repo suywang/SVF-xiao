@@ -437,8 +437,15 @@ bool Andersen::processGepPts(const PointsTo& pts, const GepCGEdge* edge)
                 continue;
             }
 
-            NodeID fieldSrcPtdNode = consCG->getGepObjVar(o, normalGepEdge->getLocationSet());
-            tmpDstPts.set(fieldSrcPtdNode);
+            if (Options::ModelArrays() && normalGepEdge->isVGep()) {
+                for (u32_t i = 0; i < Options::MaxFieldLimit(); ++i) {
+                    NodeID fieldSrcPtdNode = consCG->getGepObjVar(o, LocationSet(i));
+                    tmpDstPts.set(fieldSrcPtdNode);
+                }
+            } else {
+                NodeID fieldSrcPtdNode = consCG->getGepObjVar(o, normalGepEdge->getLocationSet());
+                tmpDstPts.set(fieldSrcPtdNode);
+            }
         }
     }
     else

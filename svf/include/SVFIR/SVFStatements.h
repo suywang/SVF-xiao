@@ -423,6 +423,7 @@ private:
 
     LocationSet ls;	///< location set of the gep edge
     bool variantField;  ///< Gep statement with a variant field index (pointer arithmetic) for struct field access (e.g., p = &(q + f), where f is a variable)
+    bool vGep {false};  ///< Gep statement with a variant field index (pointer arithmetic) for struct field access (e.g., p = &(q + f), where f is a variable)
 public:
     /// Methods for support type inquiry through isa, cast, and dyn_cast:
     //@{
@@ -468,6 +469,15 @@ public:
     inline bool isVariantFieldGep() const
     {
         return variantField;
+    }
+
+    inline bool isVGep() const
+    {
+        return vGep;
+    }
+
+    inline void setVGep() {
+        vGep = true;
     }
 
     /// constructor

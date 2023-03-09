@@ -260,7 +260,7 @@ u32_t SVFIRBuilder::inferFieldIdxFromByteOffset(const llvm::GEPOperator* gepOp, 
  * otherwise if "i" is a variable determined by runtime, then it is a variant offset
  * Return TRUE if the offset of this GEP insn is a constant.
  */
-bool SVFIRBuilder::computeGepOffset(const User *V, LocationSet& ls)
+bool SVFIRBuilder::computeGepOffset(const User *V, LocationSet& ls, bool& vGep)
 {
     assert(V);
 
@@ -287,6 +287,7 @@ bool SVFIRBuilder::computeGepOffset(const User *V, LocationSet& ls)
         //The int value of the current index operand
         const ConstantInt* op = SVFUtil::dyn_cast<ConstantInt>(offsetVal);
 
+        if(!op) vGep = true;
         // if Options::ModelConsts() is disabled. We will treat whole array as one,
         // but we can distinguish different field of an array of struct, e.g. s[1].f1 is differet from s[0].f2
         if(const ArrayType* arrTy = SVFUtil::dyn_cast<ArrayType>(gepTy))
@@ -338,7 +339,8 @@ void SVFIRBuilder::processCE(const Value* val)
             // handle recursive constant express case (gep (bitcast (gep X 1)) 1)
             processCE(opnd);
             LocationSet ls;
-            bool constGep = computeGepOffset(gepce, ls);
+            bool vGep = false;
+            bool constGep = computeGepOffset(gepce, ls, vGep);
             // must invoke pag methods here, otherwise it will be a dead recursion cycle
             const SVFValue* cval = getCurrentValue();
             const SVFBasicBlock* cbb = getCurrentBB();
@@ -347,7 +349,7 @@ void SVFIRBuilder::processCE(const Value* val)
              * The gep edge created are like constexpr (same edge may appear at multiple callsites)
              * so bb/inst of this edge may be rewritten several times, we treat it as global here.
              */
-            addGepEdge(pag->getValueNode(LLVMModuleSet::getLLVMModuleSet()->getSVFValue(opnd)), pag->getValueNode(LLVMModuleSet::getLLVMModuleSet()->getSVFValue(gepce)), ls, constGep);
+            addGepEdge(pag->getValueNode(LLVMModuleSet::getLLVMModuleSet()->getSVFValue(opnd)), pag->getValueNode(LLVMModuleSet::getLLVMModuleSet()->getSVFValue(gepce)), ls, constGep, vGep);
             setCurrentLocation(cval, cbb);
         }
         else if (const ConstantExpr* castce = isCastConstantExpr(ref))
@@ -703,8 +705,9 @@ void SVFIRBuilder::visitGetElementPtrInst(GetElementPtrInst &inst)
     NodeID src = getValueNode(inst.getPointerOperand());
 
     LocationSet ls;
-    bool constGep = computeGepOffset(&inst, ls);
-    addGepEdge(src, dst, ls, constGep);
+    bool vGep = false;
+    bool constGep = computeGepOffset(&inst, ls, vGep);
+    addGepEdge(src, dst, ls, constGep, vGep);
 }
 
 /*
@@ -1355,7 +1358,7 @@ void SVFIRBuilder::handleExtCall(CallBase* cs, const Function *callee)
                         if (op.getOperands().size() == 3)
                         {
                             LocationSet ls(op.getOperands()[2]);
-                            addNormalGepEdge(op.getOperands()[0], op.getOperands()[1], ls);
+                            addNormalGepEdge(op.getOperands()[0], op.getOperands()[1], ls, false);
                         }
                         else
                             writeWrnMsg("We need two valid NodeIDs and an offset to add a Gep edge");
@@ -1626,7 +1629,7 @@ NodeID SVFIRBuilder::getGepValVar(const Value* val, const LocationSet& ls, const
         setCurrentLocation(curVal, nullptr);
         LLVMModuleSet* llvmmodule = LLVMModuleSet::getLLVMModuleSet();
         NodeID gepNode= pag->addGepValNode(curVal, llvmmodule->getSVFValue(val),ls, NodeIDAllocator::get()->allocateValueId(),elementType->getPointerTo());
-        addGepEdge(base, gepNode, ls, true);
+        addGepEdge(base, gepNode, ls, true, false);
         setCurrentLocation(cval, cbb);
         return gepNode;
     }

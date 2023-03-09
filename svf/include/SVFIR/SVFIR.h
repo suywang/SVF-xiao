@@ -635,9 +635,9 @@ private:
     /// Add Return edge
     RetPE* addRetPE(NodeID src, NodeID dst, const CallICFGNode* cs, const FunExitICFGNode* exit);
     /// Add Gep edge
-    GepStmt* addGepStmt(NodeID src, NodeID dst, const LocationSet& ls, bool constGep);
+    GepStmt* addGepStmt(NodeID src, NodeID dst, const LocationSet& ls, bool constGep, bool vGep);
     /// Add Offset(Gep) edge
-    GepStmt* addNormalGepStmt(NodeID src, NodeID dst, const LocationSet& ls);
+    GepStmt* addNormalGepStmt(NodeID src, NodeID dst, const LocationSet& ls, bool vGep);
     /// Add Variant(Gep) edge
     GepStmt* addVariantGepStmt(NodeID src, NodeID dst, const LocationSet& ls);
     /// Add Thread fork edge for parameter passing

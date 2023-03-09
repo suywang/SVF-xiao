@@ -324,7 +324,7 @@ TDJoinPE* SVFIR::addThreadJoinPE(NodeID src, NodeID dst, const CallICFGNode* cs,
  * Find the base node id of src and connect base node to dst node
  * Create gep offset:  (offset + baseOff <nested struct gep size>)
  */
-GepStmt* SVFIR::addGepStmt(NodeID src, NodeID dst, const LocationSet& ls, bool constGep)
+GepStmt* SVFIR::addGepStmt(NodeID src, NodeID dst, const LocationSet& ls, bool constGep, bool vGep)
 {
 
     SVFVar* node = getGNode(src);
@@ -336,14 +336,14 @@ GepStmt* SVFIR::addGepStmt(NodeID src, NodeID dst, const LocationSet& ls, bool c
     }
     else
     {
-        return addNormalGepStmt(src, dst, ls);
+        return addNormalGepStmt(src, dst, ls, vGep);
     }
 }
 
 /*!
  * Add normal (Gep) edge
  */
-GepStmt* SVFIR::addNormalGepStmt(NodeID src, NodeID dst, const LocationSet& ls)
+GepStmt* SVFIR::addNormalGepStmt(NodeID src, NodeID dst, const LocationSet& ls, bool vGep)
 {
     SVFVar* baseNode = getGNode(src);
     SVFVar* dstNode = getGNode(dst);
@@ -352,6 +352,7 @@ GepStmt* SVFIR::addNormalGepStmt(NodeID src, NodeID dst, const LocationSet& ls)
     else
     {
         GepStmt* gepPE = new GepStmt(baseNode, dstNode, ls);
+        if(vGep) gepPE->setVGep();
         addToStmt2TypeMap(gepPE);
         addEdge(baseNode, dstNode, gepPE);
         return gepPE;
