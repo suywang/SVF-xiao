@@ -322,8 +322,9 @@ void ConstraintGraph::reTargetDstOfEdge(ConstraintEdge* edge, ConstraintNode* ne
     else if(NormalGepCGEdge* gep = SVFUtil::dyn_cast<NormalGepCGEdge>(edge))
     {
         const LocationSet ls = gep->getLocationSet();
+        bool isVGep = gep->isVGep();
         removeDirectEdge(gep);
-        addNormalGepCGEdge(srcId,newDstNodeID,ls, gep->isVGep());
+        addNormalGepCGEdge(srcId,newDstNodeID,ls, isVGep);
     }
     else if(VariantGepCGEdge* gep = SVFUtil::dyn_cast<VariantGepCGEdge>(edge))
     {
@@ -366,8 +367,9 @@ void ConstraintGraph::reTargetSrcOfEdge(ConstraintEdge* edge, ConstraintNode* ne
     else if(NormalGepCGEdge* gep = SVFUtil::dyn_cast<NormalGepCGEdge>(edge))
     {
         const LocationSet ls = gep->getLocationSet();
+        bool isVGep = gep->isVGep();
         removeDirectEdge(gep);
-        addNormalGepCGEdge(newSrcNodeID,dstId,ls, gep->isVGep());
+        addNormalGepCGEdge(newSrcNodeID,dstId,ls, isVGep);
     }
     else if(VariantGepCGEdge* gep = SVFUtil::dyn_cast<VariantGepCGEdge>(edge))
     {
