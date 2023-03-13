@@ -316,6 +316,8 @@ bool SVFIRBuilder::computeGepOffset(const User *V, LocationSet& ls, bool& vGep)
             if(op) {
                 // The actual index
                 s32_t idx = op->getSExtValue();
+                if(const SVFPointerType* pty = SVFUtil::dyn_cast<SVFPointerType>(svfGepTy))
+                    idx = idx * ls.getElementNum(pty->getPtrElementType());
 
                 // For pointer arithmetic we ignore the byte offset
                 // consider using inferFieldIdxFromByteOffset(geopOp,dataLayout,ls,idx)?
