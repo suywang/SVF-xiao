@@ -69,9 +69,6 @@ using namespace SVF;
 #define SVF_GLOBAL_CTORS             "llvm.global_ctors"
 #define SVF_GLOBAL_DTORS             "llvm.global_dtors"
 
-static Option<std::string> dumpJson("dump-json",
-                                    "Dump the SVFModule to JSON file", "");
-
 LLVMModuleSet *LLVMModuleSet::llvmModuleSet = nullptr;
 std::string SVFModule::pagReadFromTxt = "";
 
@@ -122,8 +119,6 @@ SVFModule* LLVMModuleSet::buildSVFModule(const std::vector<std::string> &moduleN
     SVFStat::timeOfBuildingLLVMModule = (endSVFModuleTime - startSVFModuleTime)/TIMEINTERVAL;
 
     build_symbol_table();
-
-    svfModule->writeToJson(dumpJson());
 
     return svfModule.get();
 }
@@ -806,18 +801,20 @@ void LLVMModuleSet::buildGlobalDefToRepMap()
             eit = nameToGlobalsMap.end(); it != eit; ++it)
     {
         Set<GlobalVariable*> &globals = it->second;
-        GlobalVariable *rep = *(globals.begin());
-        Set<GlobalVariable*>::iterator repit = globals.begin();
-        while (repit != globals.end())
+
+        auto repIt =
+            std::find_if(globals.begin(), globals.end(),
+                         [](GlobalVariable* g)
         {
-            GlobalVariable *cur = *repit;
-            if (cur->hasInitializer())
-            {
-                rep = cur;
-                break;
-            }
-            repit++;
-        }
+            return g->hasInitializer();
+        });
+        GlobalVariable* rep =
+            repIt != globals.end()
+            ? *repIt
+            // When there is no initializer, just pick the first one.
+            : (assert(!globals.empty() && "Empty global set"),
+               *globals.begin());
+
         for (Set<GlobalVariable*>::iterator sit = globals.begin(),
                 seit = globals.end(); sit != seit; ++sit)
         {
