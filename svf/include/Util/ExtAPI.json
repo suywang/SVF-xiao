@@ -5717,5 +5717,25 @@
             "src": "NullPtr",
             "dst": "Dummy"
         }
+    },
+    "__isoc99_scanf":{
+        "return": "void",
+        "arguments": "(int* d, int* a)",
+        "type": "EFT_NOOP",
+        "overwrite_app_function": 1,
+        "StoreStmt": {
+                "src": "NullPtr",
+                "dst": "Arg1"
+        }
+    },
+    "scanf":{
+        "return": "void",
+        "arguments": "(int* d, int* a)",
+        "type": "EFT_NOOP",
+        "overwrite_app_function": 1,
+        "StoreStmt": {
+                "src": "NullPtr",
+                "dst": "Arg1"
+        }
     }
 }
