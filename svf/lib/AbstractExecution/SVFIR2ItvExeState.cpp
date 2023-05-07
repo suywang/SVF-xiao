@@ -33,6 +33,8 @@
 using namespace SVF;
 using namespace SVFUtil;
 
+SVFIR2ItvExeState::VAddrsID SVFIR2ItvExeState::globalNullVaddrs = 0;
+
 void SVFIR2ItvExeState::applySummary(IntervalExeState &es)
 {
     for (const auto &item: es._varToItvVal)
@@ -63,6 +65,10 @@ void SVFIR2ItvExeState::moveToGlobal()
     {
         IntervalExeState::globalES._locToItvVal.insert(it);
     }
+    for (const auto &item: _es._itvMToMR)
+    {
+        IntervalExeState::globalES._itvMToMR.insert(item);
+    }
     for (const auto &_varToVAddr: _es._varToVAddrs)
     {
         IntervalExeState::globalES._varToVAddrs.insert(_varToVAddr);
@@ -71,6 +77,10 @@ void SVFIR2ItvExeState::moveToGlobal()
     {
         IntervalExeState::globalES._locToVAddrs.insert(_locToVAddr);
     }
+    for (const auto &item: _es._vAddrMToMR)
+    {
+        IntervalExeState::globalES._vAddrMToMR.insert(item);
+    }
 
     _es._varToItvVal.clear();
     IntervalExeState::globalES._varToItvVal.erase(PAG::getPAG()->getBlkPtr());
@@ -78,6 +88,8 @@ void SVFIR2ItvExeState::moveToGlobal()
     _es._locToItvVal.clear();
     _es._varToVAddrs.clear();
     _es._locToVAddrs.clear();
+    _es._itvMToMR.clear();
+    _es._vAddrMToMR.clear();
 }
 
 void SVFIR2ItvExeState::widenVAddrs(IntervalExeState &lhs, const IntervalExeState &rhs)
@@ -87,13 +99,14 @@ void SVFIR2ItvExeState::widenVAddrs(IntervalExeState &lhs, const IntervalExeStat
         auto lhsIter = lhs._varToVAddrs.find(rhsItem.first);
         if (lhsIter != lhs._varToVAddrs.end())
         {
-            for (const auto &addr: rhsItem.second)
+            for (const auto &addr: getActualVAddrs(rhsItem.second))
             {
-                if (!lhsIter->second.contains(addr))
+                if (!getActualVAddrs(lhsIter->second).test(addr))
                 {
                     for (s32_t i = 0; i < (s32_t) Options::MaxFieldLimit(); i++)
                     {
-                        lhsIter->second.join_with(getGepObjAddress(getInternalID(addr), i));
+                        lhsIter->second = unionVAddrs(lhsIter->second,
+                                                      emplaceVAddrs(getGepObjAddress(getInternalID(addr), i)));
                     }
                 }
             }
@@ -104,13 +117,14 @@ void SVFIR2ItvExeState::widenVAddrs(IntervalExeState &lhs, const IntervalExeStat
         auto lhsIter = lhs._locToVAddrs.find(rhsItem.first);
         if (lhsIter != lhs._locToVAddrs.end())
         {
-            for (const auto &addr: rhsItem.second)
+            for (const auto &addr: getActualVAddrs(rhsItem.second))
             {
-                if (!lhsIter->second.contains(addr))
+                if (!getActualVAddrs(lhsIter->second).test(addr))
                 {
                     for (s32_t i = 0; i < (s32_t) Options::MaxFieldLimit(); i++)
                     {
-                        lhsIter->second.join_with(getGepObjAddress(getInternalID(addr), i));
+                        lhsIter->second = unionVAddrs(lhsIter->second,
+                                                      emplaceVAddrs(getGepObjAddress(getInternalID(addr), i)));
                     }
                 }
             }
@@ -125,9 +139,9 @@ void SVFIR2ItvExeState::narrowVAddrs(IntervalExeState &lhs, const IntervalExeSta
         auto lhsIter = lhs._varToVAddrs.find(rhsItem.first);
         if (lhsIter != lhs._varToVAddrs.end())
         {
-            for (const auto &addr: lhsIter->second)
+            for (const auto &addr: getActualVAddrs(lhsIter->second))
             {
-                if (!rhsItem.second.contains(addr))
+                if (!getActualVAddrs(rhsItem.second).test(addr))
                 {
                     lhsIter->second = rhsItem.second;
                     break;
@@ -140,9 +154,9 @@ void SVFIR2ItvExeState::narrowVAddrs(IntervalExeState &lhs, const IntervalExeSta
         auto lhsIter = lhs._locToVAddrs.find(rhsItem.first);
         if (lhsIter != lhs._locToVAddrs.end())
         {
-            for (const auto &addr: lhsIter->second)
+            for (const auto &addr: getActualVAddrs(lhsIter->second))
             {
-                if (!rhsItem.second.contains(addr))
+                if (!getActualVAddrs(rhsItem.second).test(addr))
                 {
                     lhsIter->second = rhsItem.second;
                     break;
@@ -154,21 +168,21 @@ void SVFIR2ItvExeState::narrowVAddrs(IntervalExeState &lhs, const IntervalExeSta
 
 SVFIR2ItvExeState::VAddrs SVFIR2ItvExeState::getGepObjAddress(u32_t pointer, u32_t offset)
 {
-    assert(!getVAddrs(pointer).empty());
-    VAddrs &addrs = getVAddrs(pointer);
+    assert(!isEmpty(getVAddrs(pointer)));
+    VAddrsID &addrs = getVAddrs(pointer);
     VAddrs ret;
-    for (const auto &addr: addrs)
+    for (const auto &addr: getActualVAddrs(addrs))
     {
         int64_t baseObj = getInternalID(addr);
         if (baseObj == 0)
         {
-            ret.insert(getVirtualMemAddress(0));
+            ret.set(getVirtualMemAddress(0));
             continue;
         }
         assert(SVFUtil::isa<ObjVar>(_svfir->getGNode(baseObj)) && "Fail to get the base object address!");
         NodeID gepObj = _svfir->getGepObjVar(baseObj, offset);
         initSVFVar(gepObj);
-        ret.insert(getVirtualMemAddress(gepObj));
+        ret.set(getVirtualMemAddress(gepObj));
     }
     return ret;
 }
@@ -196,8 +210,8 @@ std::pair<s32_t, s32_t> SVFIR2ItvExeState::getGepOffset(const GepStmt *gep)
         {
             offsetLb = offsetUb = op->getSExtValue();
         }
-        /// offset is variable, the concrete value isn't sure util runtime, and maybe not a concrete value.
-        /// e.g.
+            /// offset is variable, the concrete value isn't sure util runtime, and maybe not a concrete value.
+            /// e.g.
         else
         {
             u32_t idx = _svfir->getValueNode(value);
@@ -291,10 +305,10 @@ void SVFIR2ItvExeState::initValVar(const ValVar *valVar, u32_t varId)
     {
         // TODO:miss floatpointerty, voidty, labelty, matadataty
         if (type->getKind() == SVFType::SVFIntegerTy ||
-                type->getKind() == SVFType::SVFPointerTy ||
-                type->getKind() == SVFType::SVFFunctionTy ||
-                type->getKind() == SVFType::SVFStructTy ||
-                type->getKind() == SVFType::SVFArrayTy)
+            type->getKind() == SVFType::SVFPointerTy ||
+            type->getKind() == SVFType::SVFFunctionTy ||
+            type->getKind() == SVFType::SVFStructTy ||
+            type->getKind() == SVFType::SVFArrayTy)
             // continue with null expression
             _es[varId] = IntervalValue::top();
         else
@@ -343,7 +357,7 @@ void SVFIR2ItvExeState::initObjVar(const ObjVar *objVar, u32_t varId)
             }
             else if (SVFUtil::isa<SVFGlobalValue>(obj->getValue()))
             {
-                IntervalExeState::globalES.getVAddrs(varId).insert(getVirtualMemAddress(varId));
+                IntervalExeState::globalES.getVAddrs(varId) = emplaceVAddrs(getVirtualMemAddress(varId));
             }
             else if (obj->isConstantArray() || obj->isConstantStruct())
             {
@@ -356,12 +370,12 @@ void SVFIR2ItvExeState::initObjVar(const ObjVar *objVar, u32_t varId)
         }
         else
         {
-            IntervalExeState::globalES.getVAddrs(varId).insert(getVirtualMemAddress(varId));
+            IntervalExeState::globalES.getVAddrs(varId) = emplaceVAddrs(getVirtualMemAddress(varId));
         }
     }
     else
     {
-        IntervalExeState::globalES.getVAddrs(varId).insert(getVirtualMemAddress(varId));
+        IntervalExeState::globalES.getVAddrs(varId) = emplaceVAddrs(getVirtualMemAddress(varId));
     }
 }
 
@@ -399,7 +413,7 @@ void SVFIR2ItvExeState::translateAddr(const AddrStmt *addr)
     else if (inVarToAddrsTable(addr->getRHSVarID()))
     {
         IntervalExeState::globalES.getVAddrs(addr->getLHSVarID()) = IntervalExeState::globalES.getVAddrs(
-                    addr->getRHSVarID());
+                addr->getRHSVarID());
     }
     else
     {
@@ -421,50 +435,50 @@ void SVFIR2ItvExeState::translateBinary(const BinaryOPStmt *binary)
         IntervalValue resVal;
         switch (binary->getOpcode())
         {
-        case BinaryOPStmt::Add:
-        case BinaryOPStmt::FAdd:
-            resVal = (lhs + rhs);
-            break;
-        case BinaryOPStmt::Sub:
-        case BinaryOPStmt::FSub:
-            resVal = (lhs - rhs);
-            break;
-        case BinaryOPStmt::Mul:
-        case BinaryOPStmt::FMul:
-            resVal = (lhs * rhs);
-            break;
-        case BinaryOPStmt::SDiv:
-        case BinaryOPStmt::FDiv:
-        case BinaryOPStmt::UDiv:
-            resVal = (lhs / rhs);
-            break;
-        case BinaryOPStmt::SRem:
-        case BinaryOPStmt::FRem:
-        case BinaryOPStmt::URem:
-            resVal = (lhs % rhs);
-            break;
-        case BinaryOPStmt::Xor:
-            resVal = (lhs ^ rhs);
-            break;
-        case BinaryOPStmt::And:
-            resVal = (lhs & rhs);
-            break;
-        case BinaryOPStmt::Or:
-            resVal = (lhs | rhs);
-            break;
-        case BinaryOPStmt::AShr:
-            resVal = (lhs >> rhs);
-            break;
-        case BinaryOPStmt::Shl:
-            resVal = (lhs << rhs);
-            break;
-        case BinaryOPStmt::LShr:
-            resVal = (lhs >> rhs);
-            break;
-        default:
-        {
-            assert(false && "undefined binary: ");
-        }
+            case BinaryOPStmt::Add:
+            case BinaryOPStmt::FAdd:
+                resVal = (lhs + rhs);
+                break;
+            case BinaryOPStmt::Sub:
+            case BinaryOPStmt::FSub:
+                resVal = (lhs - rhs);
+                break;
+            case BinaryOPStmt::Mul:
+            case BinaryOPStmt::FMul:
+                resVal = (lhs * rhs);
+                break;
+            case BinaryOPStmt::SDiv:
+            case BinaryOPStmt::FDiv:
+            case BinaryOPStmt::UDiv:
+                resVal = (lhs / rhs);
+                break;
+            case BinaryOPStmt::SRem:
+            case BinaryOPStmt::FRem:
+            case BinaryOPStmt::URem:
+                resVal = (lhs % rhs);
+                break;
+            case BinaryOPStmt::Xor:
+                resVal = (lhs ^ rhs);
+                break;
+            case BinaryOPStmt::And:
+                resVal = (lhs & rhs);
+                break;
+            case BinaryOPStmt::Or:
+                resVal = (lhs | rhs);
+                break;
+            case BinaryOPStmt::AShr:
+                resVal = (lhs >> rhs);
+                break;
+            case BinaryOPStmt::Shl:
+                resVal = (lhs << rhs);
+                break;
+            case BinaryOPStmt::LShr:
+                resVal = (lhs >> rhs);
+                break;
+            default:
+            {
+                assert(false && "undefined binary: ");
+            }
         }
         _es[res] = resVal;
     }
@@ -482,57 +496,57 @@ void SVFIR2ItvExeState::translateCmp(const CmpStmt *cmp)
         auto predicate = cmp->getPredicate();
         switch (predicate)
         {
-        case CmpStmt::ICMP_EQ:
-        case CmpStmt::FCMP_OEQ:
-        case CmpStmt::FCMP_UEQ:
-            resVal = (lhs == rhs);
-            break;
-        case CmpStmt::ICMP_NE:
-        case CmpStmt::FCMP_ONE:
-        case CmpStmt::FCMP_UNE:
-            resVal = (lhs != rhs);
-            break;
-        case CmpStmt::ICMP_UGT:
-        case CmpStmt::ICMP_SGT:
-        case CmpStmt::FCMP_OGT:
-        case CmpStmt::FCMP_UGT:
-            resVal = (lhs > rhs);
-            break;
-        case CmpStmt::ICMP_UGE:
-        case CmpStmt::ICMP_SGE:
-        case CmpStmt::FCMP_OGE:
-        case CmpStmt::FCMP_UGE:
-            resVal = (lhs >= rhs);
-            break;
-        case CmpStmt::ICMP_ULT:
-        case CmpStmt::ICMP_SLT:
-        case CmpStmt::FCMP_OLT:
-        case CmpStmt::FCMP_ULT:
-            resVal = (lhs < rhs);
-            break;
-        case CmpStmt::ICMP_ULE:
-        case CmpStmt::ICMP_SLE:
-        case CmpStmt::FCMP_OLE:
-        case CmpStmt::FCMP_ULE:
-            resVal = (lhs <= rhs);
-            break;
-        case CmpStmt::FCMP_FALSE:
-            resVal = IntervalValue(0, 0);
-            break;
-        case CmpStmt::FCMP_TRUE:
-            resVal = IntervalValue(1, 1);
-            break;
-        default:
-        {
-            assert(false && "undefined compare: ");
-        }
+            case CmpStmt::ICMP_EQ:
+            case CmpStmt::FCMP_OEQ:
+            case CmpStmt::FCMP_UEQ:
+                resVal = (lhs == rhs);
+                break;
+            case CmpStmt::ICMP_NE:
+            case CmpStmt::FCMP_ONE:
+            case CmpStmt::FCMP_UNE:
+                resVal = (lhs != rhs);
+                break;
+            case CmpStmt::ICMP_UGT:
+            case CmpStmt::ICMP_SGT:
+            case CmpStmt::FCMP_OGT:
+            case CmpStmt::FCMP_UGT:
+                resVal = (lhs > rhs);
+                break;
+            case CmpStmt::ICMP_UGE:
+            case CmpStmt::ICMP_SGE:
+            case CmpStmt::FCMP_OGE:
+            case CmpStmt::FCMP_UGE:
+                resVal = (lhs >= rhs);
+                break;
+            case CmpStmt::ICMP_ULT:
+            case CmpStmt::ICMP_SLT:
+            case CmpStmt::FCMP_OLT:
+            case CmpStmt::FCMP_ULT:
+                resVal = (lhs < rhs);
+                break;
+            case CmpStmt::ICMP_ULE:
+            case CmpStmt::ICMP_SLE:
+            case CmpStmt::FCMP_OLE:
+            case CmpStmt::FCMP_ULE:
+                resVal = (lhs <= rhs);
+                break;
+            case CmpStmt::FCMP_FALSE:
+                resVal = IntervalValue(0, 0);
+                break;
+            case CmpStmt::FCMP_TRUE:
+                resVal = IntervalValue(1, 1);
+                break;
+            default:
+            {
+                assert(false && "undefined compare: ");
+            }
         }
         _es[res] = resVal;
     }
     else if (inVarToAddrsTable(op0) && inVarToAddrsTable(op1))
     {
         IntervalValue resVal;
-        VAddrs &lhs = getVAddrs(op0), &rhs = getVAddrs(op1);
+        const VAddrs &lhs = getActualVAddrs(getVAddrs(op0)), &rhs = getActualVAddrs(getVAddrs(op1));
 //        if (lhs.empty() || rhs.empty()) {
 //            outs() << "empty address cmp?\n";
 //            return;
@@ -541,118 +555,118 @@ void SVFIR2ItvExeState::translateCmp(const CmpStmt *cmp)
         auto predicate = cmp->getPredicate();
         switch (predicate)
         {
-        case CmpStmt::ICMP_EQ:
-        case CmpStmt::FCMP_OEQ:
-        case CmpStmt::FCMP_UEQ:
-        {
-            if (lhs.size() == 1 && rhs.size() == 1)
+            case CmpStmt::ICMP_EQ:
+            case CmpStmt::FCMP_OEQ:
+            case CmpStmt::FCMP_UEQ:
             {
-                resVal = IntervalValue(lhs.equals(rhs));
-            }
-            else
-            {
-                if (lhs.hasIntersect(rhs))
+                if (lhs.count() == 1 && rhs.count() == 1)
                 {
-                    resVal = IntervalValue::top();
+                    resVal = IntervalValue(lhs == rhs);
                 }
                 else
                 {
-                    resVal = IntervalValue(0);
+                    if (lhs.intersects(rhs))
+                    {
+                        resVal = IntervalValue::top();
+                    }
+                    else
+                    {
+                        resVal = IntervalValue(0);
+                    }
                 }
+                break;
             }
-            break;
-        }
-        case CmpStmt::ICMP_NE:
-        case CmpStmt::FCMP_ONE:
-        case CmpStmt::FCMP_UNE:
-        {
-            if (lhs.size() == 1 && rhs.size() == 1)
+            case CmpStmt::ICMP_NE:
+            case CmpStmt::FCMP_ONE:
+            case CmpStmt::FCMP_UNE:
             {
-                resVal = IntervalValue(!lhs.equals(rhs));
-            }
-            else
-            {
-                if (lhs.hasIntersect(rhs))
+                if (lhs.count() == 1 && rhs.count() == 1)
                 {
-                    resVal = IntervalValue::top();
+                    resVal = IntervalValue(lhs != rhs);
                 }
                 else
                 {
-                    resVal = IntervalValue(1);
+                    if (lhs.intersects(rhs))
+                    {
+                        resVal = IntervalValue::top();
+                    }
+                    else
+                    {
+                        resVal = IntervalValue(1);
+                    }
                 }
+                break;
             }
-            break;
-        }
-        case CmpStmt::ICMP_UGT:
-        case CmpStmt::ICMP_SGT:
-        case CmpStmt::FCMP_OGT:
-        case CmpStmt::FCMP_UGT:
-        {
-            if (lhs.size() == 1 && rhs.size() == 1)
+            case CmpStmt::ICMP_UGT:
+            case CmpStmt::ICMP_SGT:
+            case CmpStmt::FCMP_OGT:
+            case CmpStmt::FCMP_UGT:
             {
-                resVal = IntervalValue(*lhs.begin() > *rhs.begin());
+                if (lhs.count() == 1 && rhs.count() == 1)
+                {
+                    resVal = IntervalValue(*lhs.begin() > *rhs.begin());
+                }
+                else
+                {
+                    resVal = IntervalValue::top();
+                }
+                break;
             }
-            else
+            case CmpStmt::ICMP_UGE:
+            case CmpStmt::ICMP_SGE:
+            case CmpStmt::FCMP_OGE:
+            case CmpStmt::FCMP_UGE:
             {
-                resVal = IntervalValue::top();
+                if (lhs.count() == 1 && rhs.count() == 1)
+                {
+                    resVal = IntervalValue(*lhs.begin() >= *rhs.begin());
+                }
+                else
+                {
+                    resVal = IntervalValue::top();
+                }
+                break;
             }
-            break;
-        }
-        case CmpStmt::ICMP_UGE:
-        case CmpStmt::ICMP_SGE:
-        case CmpStmt::FCMP_OGE:
-        case CmpStmt::FCMP_UGE:
-        {
-            if (lhs.size() == 1 && rhs.size() == 1)
+            case CmpStmt::ICMP_ULT:
+            case CmpStmt::ICMP_SLT:
+            case CmpStmt::FCMP_OLT:
+            case CmpStmt::FCMP_ULT:
             {
-                resVal = IntervalValue(*lhs.begin() >= *rhs.begin());
+                if (lhs.count() == 1 && rhs.count() == 1)
+                {
+                    resVal = IntervalValue(*lhs.begin() < *rhs.begin());
+                }
+                else
+                {
+                    resVal = IntervalValue::top();
+                }
+                break;
             }
-            else
+            case CmpStmt::ICMP_ULE:
+            case CmpStmt::ICMP_SLE:
+            case CmpStmt::FCMP_OLE:
+            case CmpStmt::FCMP_ULE:
             {
-                resVal = IntervalValue::top();
+                if (lhs.count() == 1 && rhs.count() == 1)
+                {
+                    resVal = IntervalValue(*lhs.begin() <= *rhs.begin());
+                }
+                else
+                {
+                    resVal = IntervalValue::top();
+                }
+                break;
             }
-            break;
-        }
-        case CmpStmt::ICMP_ULT:
-        case CmpStmt::ICMP_SLT:
-        case CmpStmt::FCMP_OLT:
-        case CmpStmt::FCMP_ULT:
-        {
-            if (lhs.size() == 1 && rhs.size() == 1)
+            case CmpStmt::FCMP_FALSE:
+                resVal = IntervalValue(0, 0);
+                break;
+            case CmpStmt::FCMP_TRUE:
+                resVal = IntervalValue(1, 1);
+                break;
+            default:
             {
-                resVal = IntervalValue(*lhs.begin() < *rhs.begin());
+                assert(false && "undefined compare: ");
             }
-            else
-            {
-                resVal = IntervalValue::top();
-            }
-            break;
-        }
-        case CmpStmt::ICMP_ULE:
-        case CmpStmt::ICMP_SLE:
-        case CmpStmt::FCMP_OLE:
-        case CmpStmt::FCMP_ULE:
-        {
-            if (lhs.size() == 1 && rhs.size() == 1)
-            {
-                resVal = IntervalValue(*lhs.begin() <= *rhs.begin());
-            }
-            else
-            {
-                resVal = IntervalValue::top();
-            }
-            break;
-        }
-        case CmpStmt::FCMP_FALSE:
-            resVal = IntervalValue(0, 0);
-            break;
-        case CmpStmt::FCMP_TRUE:
-            resVal = IntervalValue(1, 1);
-            break;
-        default:
-        {
-            assert(false && "undefined compare: ");
-        }
         }
         _es[res] = resVal;
     }
@@ -664,40 +678,66 @@ void SVFIR2ItvExeState::translateLoad(const LoadStmt *load)
     u32_t lhs = load->getLHSVarID();
     if (inVarToAddrsTable(rhs))
     {
-        VAddrs &addrs = getVAddrs(rhs);
+        const VAddrs &addrs = getActualVAddrs(getVAddrs(rhs));
         assert(!addrs.empty());
+        Set<VAddrsID> addrsIds;
+        int type = -1; // 0: itv, 1: addr
         for (const auto &addr: addrs)
         {
-            u32_t objId = getInternalID(addr);
-            if (inLocToIValTable(objId))
-                _es[lhs] = IntervalValue::bottom();
-            else if (inLocToAddrsTable(objId))
-                _es.getVAddrs(lhs).setBottom();
-            break;
-        }
-        for (const auto &addr: addrs)
-        {
-            u32_t objId = getInternalID(addr);
-            if (inLocToIValTable(objId))
-            {
-                if (!inVarToIValTable(lhs))
-                {
-                    _es[lhs] = _es.load(addr);
+            if(_es.isNullPtr(addr)) continue;
+            switch (type) {
+                case 0: {
+                    if(_es.inItvMToMRTable(addr))
+                        addrsIds.insert(_es.getItvMROfM(addr));
+                    break;
                 }
-                else
-                {
-                    _es[lhs].join_with(_es.load(addr));
+                case 1: {
+                    if(_es.inVAddrMToMRTable(addr))
+                        addrsIds.insert(_es.getVAddrMROfM(addr));
+                    break;
+                }
+                default: {
+                    if (inLocToIValTable(addr)) {
+                        type = 0;
+                        addrsIds.insert(_es.getItvMROfM(addr));
+                    } else if (inLocToAddrsTable(addr)) {
+                        type = 1;
+                        addrsIds.insert(_es.getVAddrMROfM(addr));
+                    }
                 }
             }
-            else if (inLocToAddrsTable(objId))
-            {
-                if (!inVarToAddrsTable(lhs))
-                {
-                    _es.getVAddrs(lhs) = _es.loadVAddrs(addr);
+        }
+        if (type == 0) {
+            _es[lhs] = IntervalValue::bottom();
+        } else if (type == 1) {
+            _es.getVAddrs(lhs) = emptyVAddrs();
+        }
+        for (const auto &addrId: addrsIds)
+        {
+            switch (type) {
+                case 0: {
+                    if (!inVarToIValTable(lhs))
+                    {
+                        _es[lhs] = _es.load(*getActualVAddrs(addrId).begin());
+                    }
+                    else
+                    {
+                        _es[lhs].join_with(_es.load(*getActualVAddrs(addrId).begin()));
+                    }
+                    break;
                 }
-                else
-                {
-                    _es.getVAddrs(lhs).join_with(_es.loadVAddrs(addr));
+                case 1: {
+                    if (!inVarToAddrsTable(lhs))
+                    {
+                        _es.getVAddrs(lhs) = _es.loadVAddrs(*getActualVAddrs(addrId).begin());
+                    }
+                    else
+                    {
+                        _es.getVAddrs(lhs) = unionVAddrs(_es.getVAddrs(lhs), _es.loadVAddrs(*getActualVAddrs(addrId).begin()));
+                    }
+                }
+                default: {
+
                 }
             }
         }
@@ -712,23 +752,15 @@ void SVFIR2ItvExeState::translateStore(const StoreStmt *store)
     {
         if (inVarToIValTable(rhs))
         {
-            assert(!getVAddrs(lhs).empty());
-            VAddrs &addrs = getVAddrs(lhs);
-            for (const auto &addr: addrs)
-            {
-                _es.store(addr, _es[rhs]);
-            }
+            VAddrsID addrsId = getVAddrs(lhs);
+            assert(!isEmpty(addrsId));
+            _es.store(addrsId, _es[rhs]);
         }
         else if (inVarToAddrsTable(rhs))
         {
-            assert(!getVAddrs(lhs).empty());
-            VAddrs &addrs = getVAddrs(lhs);
-            for (const auto &addr: addrs)
-            {
-                assert(!getVAddrs(rhs).empty());
-                _es.storeVAddrs(addr, getVAddrs(rhs));
-            }
-
+            VAddrsID addrsId = getVAddrs(lhs);
+            assert(!isEmpty(addrsId));
+            _es.storeVAddrs(addrsId, getVAddrs(rhs));
         }
     }
 }
@@ -749,7 +781,7 @@ void SVFIR2ItvExeState::translateCopy(const CopyStmt *copy)
         }
         else if (inVarToAddrsTable(rhs))
         {
-            assert(!getVAddrs(rhs).empty());
+            assert(!isEmpty(getVAddrs(rhs)));
             _es.getVAddrs(lhs) = getVAddrs(rhs);
         }
     }
@@ -760,8 +792,7 @@ void SVFIR2ItvExeState::translateGep(const GepStmt *gep)
     u32_t rhs = gep->getRHSVarID();
     u32_t lhs = gep->getLHSVarID();
     if (!inVarToAddrsTable(rhs)) return;
-    assert(!getVAddrs(rhs).empty());
-    VAddrs &rhsVal = getVAddrs(rhs);
+    const VAddrs &rhsVal = getActualVAddrs(getVAddrs(rhs));
     if (rhsVal.empty()) return;
     std::pair<s32_t, s32_t> offsetPair = getGepOffset(gep);
     if (offsetPair.first == -1 && offsetPair.second == -1) return;
@@ -771,7 +802,7 @@ void SVFIR2ItvExeState::translateGep(const GepStmt *gep)
     }
     else
     {
-        VAddrs gepAddrs;
+        VAddrsID gepAddrs = 0;
         s32_t ub = offsetPair.second;
         if (offsetPair.second > (s32_t) Options::MaxFieldLimit() - 1)
         {
@@ -779,9 +810,9 @@ void SVFIR2ItvExeState::translateGep(const GepStmt *gep)
         }
         for (s32_t i = offsetPair.first; i <= ub; i++)
         {
-            gepAddrs.join_with(getGepObjAddress(rhs, i));
+            gepAddrs = unionVAddrs(gepAddrs, emplaceVAddrs(getGepObjAddress(rhs, i)));
         }
-        if(gepAddrs.empty()) return;
+        if(isEmpty(gepAddrs)) return;
         _es.getVAddrs(lhs) = gepAddrs;
         return;
     }
@@ -808,8 +839,8 @@ void SVFIR2ItvExeState::translateSelect(const SelectStmt *select)
     {
         if (_es[cond].is_numeral())
         {
-            assert(!getVAddrs(fval).empty());
-            assert(!getVAddrs(tval).empty());
+            assert(!isEmpty(getVAddrs(fval)));
+            assert(!isEmpty(getVAddrs(tval)));
             _es.getVAddrs(res) = _es[cond].is_zero() ? getVAddrs(fval) : getVAddrs(tval);
         }
     }
@@ -835,15 +866,15 @@ void SVFIR2ItvExeState::translatePhi(const PhiStmt *phi)
         }
         else if (inVarToAddrsTable(curId))
         {
-            assert(!getVAddrs(curId).empty());
-            const VAddrs &cur = getVAddrs(curId);
+            VAddrsID cur = getVAddrs(curId);
+            assert(!isEmpty(cur));
             if (!inVarToAddrsTable(res))
             {
                 _es.getVAddrs(res) = cur;
             }
             else
             {
-                _es.getVAddrs(res).join_with(cur);
+                _es.getVAddrs(res)= unionVAddrs(_es.getVAddrs(res), cur);
             }
         }
     }
@@ -860,7 +891,7 @@ void SVFIR2ItvExeState::translateCall(const CallPE *callPE)
     }
     else if (inVarToAddrsTable(rhs))
     {
-        assert(!getVAddrs(rhs).empty());
+        assert(!isEmpty(getVAddrs(rhs)));
         _es.getVAddrs(lhs) = getVAddrs(rhs);
     }
 }
@@ -875,7 +906,7 @@ void SVFIR2ItvExeState::translateRet(const RetPE *retPE)
     }
     else if (inVarToAddrsTable(rhs))
     {
-        assert(!getVAddrs(rhs).empty());
+        assert(!isEmpty(getVAddrs(rhs)));
         _es.getVAddrs(lhs) = getVAddrs(rhs);
     }
 }

@@ -55,20 +55,16 @@ protected:
     VarToValMap _varToItvVal;
     /// key: nodeID value: Domain Value
     LocToValMap _locToItvVal;
+    VAddrToVAddrsID _itvMToMR;
 
 
 public:
     /// default constructor, default pc is true
     IntervalExeState() : ExeState(ExeState::IntervalK) {}
 
-    /// set path constraints, val2val and loc2val map
-    IntervalExeState(VarToValMap &_varToValMap, LocToValMap &_locToValMap) : ExeState(ExeState::IntervalK),
-        _varToItvVal(_varToValMap),
-        _locToItvVal(_locToValMap) {}
-
     /// copy constructor
     IntervalExeState(const IntervalExeState &rhs) : ExeState(rhs), _varToItvVal(rhs.getVarToVal()),
-        _locToItvVal(rhs.getLocToVal())
+                                                    _locToItvVal(rhs.getLocToVal()), _itvMToMR(rhs.getItvMToMR())
     {
 
     }
@@ -80,6 +76,7 @@ public:
         {
             _varToItvVal = rhs._varToItvVal;
             _locToItvVal = rhs._locToItvVal;
+            _itvMToMR = rhs._itvMToMR;
             ExeState::operator=(rhs);
         }
         return *this;
@@ -87,8 +84,9 @@ public:
 
     /// move constructor
     IntervalExeState(IntervalExeState &&rhs) : ExeState(std::move(rhs)),
-        _varToItvVal(std::move(rhs._varToItvVal)),
-        _locToItvVal(std::move(rhs._locToItvVal))
+                                               _varToItvVal(std::move(rhs._varToItvVal)),
+                                               _locToItvVal(std::move(rhs._locToItvVal)),
+                                               _itvMToMR(std::move(rhs._itvMToMR))
     {
 
     }
@@ -100,6 +98,7 @@ public:
         {
             _varToItvVal = std::move(rhs._varToItvVal);
             _locToItvVal = std::move(rhs._locToItvVal);
+            _itvMToMR = std::move(rhs._itvMToMR);
             ExeState::operator=(std::move(rhs));
         }
         return *this;
@@ -138,7 +137,7 @@ public:
         return inv;
     }
 
-    VAddrs &getVAddrs(u32_t id) override
+    VAddrsID &getVAddrs(u32_t id) override
     {
         auto it = _varToVAddrs.find(id);
         if (it != _varToVAddrs.end())
@@ -159,26 +158,78 @@ public:
                globalES._varToVAddrs.find(id) != globalES._varToVAddrs.end();
     }
 
-    inline bool inLocToIValTable(u32_t id) const
-    {
-        return _locToItvVal.find(id) != _locToItvVal.end() ||
-               globalES._locToItvVal.find(id) != globalES._locToItvVal.end();
+    inline VAddrsID getItvMROfM(u32_t addr) const {
+        auto it = _itvMToMR.find(addr);
+        if (it != _itvMToMR.end())
+            return it->second;
+        else {
+            auto globIt = globalES._itvMToMR.find(addr);
+            if (globIt != globalES._itvMToMR.end()) {
+                return globIt->second;
+            } else {
+                assert(false && "addr not exist!");
+                abort();
+            }
+        }
     }
 
-    inline bool inLocalLocToIValTable(u32_t id) const
-    {
-        return _locToItvVal.find(id) != _locToItvVal.end();
+    inline VAddrsID getVAddrMROfM(u32_t addr) const {
+        auto it = _vAddrMToMR.find(addr);
+        if (it != _vAddrMToMR.end())
+            return it->second;
+        else {
+            auto globIt = globalES._vAddrMToMR.find(addr);
+            if (globIt != globalES._vAddrMToMR.end()) {
+                return globIt->second;
+            } else {
+                assert(false && "addr not exist!");
+                abort();
+            }
+        }
     }
 
-    inline bool inLocToAddrsTable(u32_t id) const override
+    inline virtual bool inItvMToMRTable(u32_t addr) const
     {
-        return _locToVAddrs.find(id) != _locToVAddrs.end() ||
-               globalES._locToVAddrs.find(id) != globalES._locToVAddrs.end();
+        return _itvMToMR.find(addr) != _itvMToMR.end() ||
+            globalES._itvMToMR.find(addr) != globalES._itvMToMR.end();
     }
 
-    inline bool inLocalLocToAddrsTable(u32_t id) const
+    inline virtual bool inLocalItvMToMRTable(u32_t addr) const
     {
-        return _locToVAddrs.find(id) != _locToVAddrs.end();
+        return _itvMToMR.find(addr) != _itvMToMR.end();
+    }
+
+    inline bool inLocToIValTable(u32_t addr) const
+    {
+        return _itvMToMR.find(addr) != _itvMToMR.end() ||
+               globalES._itvMToMR.find(addr) != globalES._itvMToMR.end();
+    }
+
+    inline bool inLocalLocToIValTable(u32_t addr) const
+    {
+        return _itvMToMR.find(addr) != _itvMToMR.end();
+    }
+
+    inline bool inVAddrMToMRTable(u32_t id) const override
+    {
+        return _vAddrMToMR.find(id) != _vAddrMToMR.end() ||
+               globalES._vAddrMToMR.find(id) != globalES._vAddrMToMR.end();
+    }
+
+    inline virtual bool inLocalVAddrMToMRTable(u32_t id) const
+    {
+        return _vAddrMToMR.find(id) != _vAddrMToMR.end();
+    }
+
+    inline bool inLocToAddrsTable(u32_t addr) const override
+    {
+        return _vAddrMToMR.find(addr) != _vAddrMToMR.end() ||
+               globalES._vAddrMToMR.find(addr) != globalES._vAddrMToMR.end();
+    }
+
+    inline bool inLocalLocToAddrsTable(u32_t addr) const
+    {
+        return _vAddrMToMR.find(addr) != _vAddrMToMR.end();
     }
 
     bool equals(const IntervalExeState &other) const;
@@ -196,6 +247,12 @@ public:
     const LocToValMap &getLocToVal() const
     {
         return _locToItvVal;
+    }
+
+    /// get loc2val map
+    const VAddrToVAddrsID &getItvMToMR() const
+    {
+        return _itvMToMR;
     }
 
     ///  [], call getValueExpr()
@@ -281,75 +338,73 @@ public:
     u32_t hash() const override;
 
 public:
-    inline void store(u32_t addr, const IntervalValue &val)
-    {
-        assert(isVirtualMemAddress(addr) && "not virtual address?");
-        if (isNullPtr(addr)) return;
-        u32_t objId = getInternalID(addr);
-        _locToItvVal[objId] = val;
-    }
+    void store(u32_t addr, const IntervalValue &val);
 
     inline IntervalValue &load(u32_t addr)
     {
         assert(isVirtualMemAddress(addr) && "not virtual address?");
-        u32_t objId = getInternalID(addr);
-        auto it = _locToItvVal.find(objId);
-        if(it != _locToItvVal.end())
-            return it->second;
+        auto it = _itvMToMR.find(addr);
+        if(it != _itvMToMR.end())
+            return _locToItvVal[it->second];
         else
         {
-            auto globIt = globalES._locToItvVal.find(objId);
-            if(globIt != globalES._locToItvVal.end())
-                return globIt->second;
-            else
-                return _locToItvVal[objId];
+            auto globIt = globalES._itvMToMR.find(addr);
+            if (globIt != globalES._itvMToMR.end()) {
+                return globalES._locToItvVal[globIt->second];
+            } else {
+                auto itvIt = _itvMToMR.find(addr);
+                assert(itvIt != _itvMToMR.end() && "null dereference!");
+                return _locToItvVal[itvIt->second];
+            }
         }
     }
 
-    inline VAddrs &loadVAddrs(u32_t addr) override
+    inline VAddrsID &loadVAddrs(u32_t addr) override
     {
         assert(isVirtualMemAddress(addr) && "not virtual address?");
-        u32_t objId = getInternalID(addr);
-        auto it = _locToVAddrs.find(objId);
-        if(it != _locToVAddrs.end())
-            return it->second;
+        auto it = _vAddrMToMR.find(addr);
+        if(it != _vAddrMToMR.end())
+            return _locToVAddrs[it->second];
         else
         {
-            auto globIt = globalES._locToVAddrs.find(objId);
-            if(globIt != globalES._locToVAddrs.end())
-                return globIt->second;
-            else
-                return _locToVAddrs[objId];
+            auto globIt = globalES._vAddrMToMR.find(addr);
+            if (globIt != globalES._vAddrMToMR.end()) {
+                return globalES._locToVAddrs[globIt->second];
+            } else {
+                auto addrIt = _vAddrMToMR.find(addr);
+                assert(addrIt != _vAddrMToMR.end() && "null dereference!");
+                return _locToVAddrs[addrIt->second];
+            }
         }
     }
 
-    inline IntervalValue& getLocToItv(u32_t id)
+    inline IntervalValue& getLocToItv(u32_t vAddrId)
     {
-        auto it = _locToItvVal.find(id);
+        auto it = _locToItvVal.find(vAddrId);
         if(it != _locToItvVal.end())
             return it->second;
         else
         {
-            auto globIt = globalES._locToItvVal.find(id);
+            auto globIt = globalES._locToItvVal.find(vAddrId);
             if(globIt != globalES._locToItvVal.end())
                 return globIt->second;
             else
-                return _locToItvVal[id];
+                return _locToItvVal[vAddrId];
         }
     }
 
-    inline VAddrs& getLocVAddrs(u32_t id)
+    inline VAddrsID& getLocVAddrs(u32_t vAddrId)
     {
-        auto it = _locToVAddrs.find(id);
+        auto it = _locToVAddrs.find(vAddrId);
         if(it != _locToVAddrs.end())
             return it->second;
         else
         {
-            auto globIt = globalES._locToVAddrs.find(id);
+            auto globIt = globalES._locToVAddrs.find(vAddrId);
             if(globIt != globalES._locToVAddrs.end())
                 return globIt->second;
             else
-                return _locToVAddrs[id];
+                return _locToVAddrs[vAddrId];
         }
     }
 
@@ -377,16 +432,22 @@ public:
         return true;
     }
 
-
-    static bool lessThanVarToValMap(const VarToValMap &lhs, const VarToValMap &rhs)
+    static bool eqLocToValMap(const VarToValMap &lhs, const VAddrToVAddrsID &lhsMToMR, const VarToValMap &rhs,
+                              const VAddrToVAddrsID &rhsMToMR)
     {
-        if (lhs.empty()) return !rhs.empty();
-        for (const auto &item: lhs)
+        if (lhsMToMR.size() != rhsMToMR.size()) return false;
+        Set<std::pair<VAddrsID, VAddrsID>> visited;
+        for (const auto &item: lhsMToMR)
         {
-            auto it = rhs.find(item.first);
-            if (it == rhs.end()) return false;
-            // judge from expr id
-            if (item.second.geq(it->second)) return false;
+            auto it = rhsMToMR.find(item.first);
+            if (it == rhsMToMR.end())
+                return false;
+            if(visited.count({it->second, item.second})) continue;
+            visited.emplace(it->second, item.second);
+            if (!lhs.at(item.second).equals(rhs.at(it->second)))
+            {
+                return false;
+            }
         }
         return true;
     }
@@ -405,10 +466,25 @@ public:
         return true;
     }
 
+    static bool geqLocToValMap(const VarToValMap &lhs, const VAddrToVAddrsID &lhsItvMToMR, const VarToValMap &rhs,
+                               const VAddrToVAddrsID &rhsItvMToMR) {
+        if (rhsItvMToMR.empty()) return true;
+        Set<std::pair<VAddrsID, VAddrsID>> visited;
+        for (const auto &item: rhsItvMToMR) {
+            auto it = lhsItvMToMR.find(item.first);
+            if (it == lhsItvMToMR.end()) return false;
+            // judge from expr id
+            if(visited.count({it->second, item.second})) continue;
+            visited.emplace(it->second, item.second);
+            if (!lhs.at(it->second).geq(rhs.at(item.second))) return false;
+        }
+        return true;
+    }
+
     bool operator==(const IntervalExeState &rhs) const
     {
         return ExeState::operator==(rhs) && eqVarToValMap(_varToItvVal, rhs.getVarToVal()) &&
-               eqVarToValMap(_locToItvVal, rhs.getLocToVal());
+               eqLocToValMap(_locToItvVal, _itvMToMR, rhs.getLocToVal(), rhs.getItvMToMR());
     }
 
     bool operator!=(const IntervalExeState &rhs) const
@@ -424,14 +500,17 @@ public:
 
     bool operator>=(const IntervalExeState &rhs) const
     {
-        return geqVarToValMap(_varToItvVal, rhs.getVarToVal()) && geqVarToValMap(_locToItvVal, rhs.getLocToVal());
+        return geqVarToValMap(_varToItvVal, rhs.getVarToVal()) &&
+               geqLocToValMap(_locToItvVal, _itvMToMR, rhs.getLocToVal(), rhs.getItvMToMR());
     }
 
     void clear()
     {
         _locToItvVal.clear();
+        _itvMToMR.clear();
         _varToItvVal.clear();
         _locToVAddrs.clear();
+        _vAddrMToMR.clear();
         _varToVAddrs.clear();
     }
 
@@ -439,7 +518,11 @@ public:
 private:
     void printTable(const VarToValMap &table, std::ostream &oss) const;
 
+    void printLocTable(const VarToValMap &table, std::ostream &oss) const;
+
     void printTable(const VarToVAddrs &table, std::ostream &oss) const;
+
+    void printLocTable(const VarToVAddrs &table, std::ostream &oss) const;
 };
 }
 

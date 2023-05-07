@@ -34,6 +34,8 @@
 #include "AbstractExecution/AddressValue.h"
 #include "AbstractExecution/NumericLiteral.h"
 #include "Util/Z3Expr.h"
+#include "MemoryModel/PersistentPointsToCache.h"
+#include "MemoryModel/PointsTo.h"
 
 namespace SVF
 {
@@ -49,8 +51,11 @@ class ExeState
 
 public:
 
-    typedef AddressValue VAddrs;
-    typedef Map<u32_t, VAddrs> VarToVAddrs;
+    typedef u32_t VAddr;
+    typedef PointsTo VAddrs;
+    typedef PointsToID VAddrsID;
+    typedef Map<NodeID, VAddrsID> VarToVAddrs;
+    typedef Map<VAddr, VAddrsID> VAddrToVAddrsID;
     /// Execution state kind
     enum ExeState_TYPE
     {
@@ -65,10 +70,12 @@ public:
     virtual ~ExeState() = default;
 
     ExeState(const ExeState &rhs) : _varToVAddrs(rhs._varToVAddrs),
-        _locToVAddrs(rhs._locToVAddrs) {}
+                                    _locToVAddrs(rhs._locToVAddrs),
+                                    _vAddrMToMR(rhs._vAddrMToMR) {}
 
     ExeState(ExeState &&rhs) noexcept: _varToVAddrs(std::move(rhs._varToVAddrs)),
-        _locToVAddrs(std::move(rhs._locToVAddrs)) {}
+                                       _locToVAddrs(std::move(rhs._locToVAddrs)),
+                                       _vAddrMToMR(std::move(rhs._vAddrMToMR)) {}
 
     ExeState &operator=(const ExeState &rhs)
     {
@@ -76,6 +83,7 @@ public:
         {
             _varToVAddrs = rhs._varToVAddrs;
             _locToVAddrs = rhs._locToVAddrs;
+            _vAddrMToMR = rhs._vAddrMToMR;
         }
         return *this;
     }
@@ -86,6 +94,7 @@ public:
         {
             _varToVAddrs = std::move(rhs._varToVAddrs);
             _locToVAddrs = std::move(rhs._locToVAddrs);
+            _vAddrMToMR = std::move(rhs._vAddrMToMR);
         }
         return *this;
     }
@@ -133,34 +142,39 @@ public:
         return _locToVAddrs;
     }
 
+    inline virtual const VAddrToVAddrsID &getVAddrMToMR() const
+    {
+        return _vAddrMToMR;
+    }
+
     inline virtual bool inVarToAddrsTable(u32_t id) const
     {
         return _varToVAddrs.find(id) != _varToVAddrs.end();
     }
 
-    inline virtual bool inLocToAddrsTable(u32_t id) const
+    inline virtual bool inVAddrMToMRTable(u32_t id) const
     {
-        return _locToVAddrs.find(id) != _locToVAddrs.end();
+        return _vAddrMToMR.find(id) != _vAddrMToMR.end();
     }
 
-    virtual VAddrs &getVAddrs(u32_t id)
+    inline virtual bool inLocToAddrsTable(u32_t addr) const
+    {
+        return _vAddrMToMR.find(addr) != _vAddrMToMR.end();
+    }
+
+    virtual VAddrsID &getVAddrs(u32_t id)
     {
         return _varToVAddrs[id];
     }
 
-    inline virtual void storeVAddrs(u32_t addr, const VAddrs &vaddrs)
-    {
-        assert(isVirtualMemAddress(addr) && "not virtual address?");
-        if(isNullPtr(addr)) return;
-        u32_t objId = getInternalID(addr);
-        _locToVAddrs[objId] = vaddrs;
-    }
+    virtual void storeVAddrs(u32_t vAddrId, const VAddrsID &vaddrs);
 
-    inline virtual VAddrs &loadVAddrs(u32_t addr)
+    inline virtual VAddrsID &loadVAddrs(u32_t addr)
     {
         assert(isVirtualMemAddress(addr) && "not virtual address?");
-        u32_t objId = getInternalID(addr);
-        return _locToVAddrs[objId];
+        auto it = _vAddrMToMR.find(addr);
+        assert(it != _vAddrMToMR.end() && "null dereference!");
+        return _locToVAddrs[it->second];
     }
 
     inline bool isNullPtr(u32_t addr)
@@ -169,8 +183,9 @@ public:
     }
 
 protected:
-    VarToVAddrs _varToVAddrs{{0, getVirtualMemAddress(0)}};
+    VarToVAddrs _varToVAddrs;
     VarToVAddrs _locToVAddrs;
+    VAddrToVAddrsID _vAddrMToMR;
 
 protected:
 
@@ -184,6 +199,23 @@ protected:
                 return false;
             if (item.second != it->second)
             {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static bool eqLocToVAddrs(const VarToVAddrs &lhs, const VAddrToVAddrsID &lhsMToMR, const VarToVAddrs &rhs,
+                              const VAddrToVAddrsID &rhsMToMR) {
+        if (lhsMToMR.size() != rhsMToMR.size()) return false;
+        Set<std::pair<VAddrsID, VAddrsID>> visited;
+        for (const auto &item: lhsMToMR) {
+            auto it = rhsMToMR.find(item.first);
+            if (it == rhsMToMR.end())
+                return false;
+            if(visited.count({it->second, item.second})) continue;
+            visited.emplace(it->second, item.second);
+            if (lhs.at(item.second) != rhs.at(it->second)) {
                 return false;
             }
         }
@@ -213,6 +245,43 @@ public:
     {
         return AddressValue::getInternalID(idx);
     }
+
+public:
+
+    static bool emptyVAddrs() {
+        return ptCache.emptyPointsToId();
+    }
+
+    static bool isEmpty(const VAddrsID& lhs) {
+        return lhs == ptCache.emptyPointsToId();
+    }
+
+    static VAddrsID unionVAddrs(const VAddrsID& lhs, const VAddrsID& rhs) {
+        return ptCache.unionPts(lhs, rhs);
+    }
+
+    static VAddrsID intersectVAddrs(const VAddrsID& lhs, const VAddrsID& rhs) {
+        return ptCache.intersectPts(lhs, rhs);
+    }
+
+    static const VAddrs &getActualVAddrs(VAddrsID id)
+    {
+        return ptCache.getActualPts(id);
+    }
+
+    static VAddrsID emplaceVAddrs(const VAddrs& addrs)
+    {
+        return ptCache.emplacePts(addrs);
+    }
+
+    static VAddrsID emplaceVAddrs(NodeID addr)
+    {
+        VAddrs vAddrs;
+        vAddrs.set(addr);
+        return ptCache.emplacePts(vAddrs);
+    }
+protected:
+    static PersistentPointsToCache<VAddrs> ptCache;
 
 
 }; // end class ExeState
