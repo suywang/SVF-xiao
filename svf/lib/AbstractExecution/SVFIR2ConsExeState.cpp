@@ -34,10 +34,12 @@ using namespace std;
 
 SVFIR2ConsExeState::~SVFIR2ConsExeState()
 {
-    ConsExeState::globalConsES._varToVal.clear();
-    ConsExeState::globalConsES._varToVAddrs.clear();
-    ConsExeState::globalConsES._locToVal.clear();
-    ConsExeState::globalConsES._locToVAddrs.clear();
+    ConsExeState::globalConsES->_varToVal.clear();
+    ConsExeState::globalConsES->_varToVAddrs.clear();
+    ConsExeState::globalConsES->_locToVal.clear();
+    ConsExeState::globalConsES->_locToVAddrs.clear();
+    delete ConsExeState::globalConsES;
+    ConsExeState::globalConsES = nullptr;
 }
 /// Translator for llvm ir
 //{%
@@ -51,11 +53,11 @@ void SVFIR2ConsExeState::translateAddr(const AddrStmt *addr)
     initSVFVar(addr->getRHSVarID());
     if (inVarToValTable(addr->getRHSVarID()))
     {
-        _es->globalConsES._varToVal[addr->getLHSVarID()] = _es->globalConsES._varToVal[addr->getRHSVarID()];
+        _es->globalConsES->_varToVal[addr->getLHSVarID()] = _es->globalConsES->_varToVal[addr->getRHSVarID()];
     }
     else if (inVarToAddrsTable(addr->getRHSVarID()))
     {
-        _es->globalConsES._varToVAddrs[addr->getLHSVarID()] = _es->globalConsES._varToVAddrs[addr->getRHSVarID()];
+        _es->globalConsES->_varToVAddrs[addr->getLHSVarID()] = _es->globalConsES->_varToVAddrs[addr->getRHSVarID()];
     }
     else
     {
@@ -458,7 +460,7 @@ void SVFIR2ConsExeState::translateCopy(const CopyStmt *copy)
     u32_t rhs = copy->getRHSVarID();
     if (PAG::getPAG()->isBlkPtr(lhs))
     {
-        _es->globalConsES._varToVal[lhs] = SingleAbsValue::topConstant();
+        _es->globalConsES->_varToVal[lhs] = SingleAbsValue::topConstant();
     }
     else
     {
@@ -728,33 +730,33 @@ void SVFIR2ConsExeState::initObjVar(const ObjVar *objVar, u32_t varId)
         {
             if (const SVFConstantInt *consInt = SVFUtil::dyn_cast<SVFConstantInt>(obj->getValue()))
             {
-                _es->globalConsES._varToVal[varId] = consInt->getSExtValue();
+                _es->globalConsES->_varToVal[varId] = consInt->getSExtValue();
             }
             else if (const SVFConstantFP *consFP = SVFUtil::dyn_cast<SVFConstantFP>(obj->getValue()))
-                _es->globalConsES._varToVal[varId] = consFP->getFPValue();
+                _es->globalConsES->_varToVal[varId] = consFP->getFPValue();
             else if (SVFUtil::isa<SVFConstantNullPtr>(obj->getValue()))
-                _es->globalConsES._varToVal[varId] = 0;
+                _es->globalConsES->_varToVal[varId] = 0;
             else if (SVFUtil::isa<SVFGlobalValue>(obj->getValue()))
-                _es->globalConsES._varToVAddrs[varId] = getVirtualMemAddress(varId);
+                _es->globalConsES->_varToVAddrs[varId] = getVirtualMemAddress(varId);
             else if (obj->isConstDataOrAggData())
             {
                 // TODO
                 //                assert(false && "implement this part");
-                _es->globalConsES._varToVal[varId] = SingleAbsValue::topConstant();
+                _es->globalConsES->_varToVal[varId] = SingleAbsValue::topConstant();
             }
             else
             {
-                _es->globalConsES._varToVal[varId] = SingleAbsValue::topConstant();
+                _es->globalConsES->_varToVal[varId] = SingleAbsValue::topConstant();
             }
         }
         else
         {
-            _es->globalConsES._varToVAddrs[varId] = getVirtualMemAddress(varId);
+            _es->globalConsES->_varToVAddrs[varId] = getVirtualMemAddress(varId);
         }
     }
     else
     {
-        _es->globalConsES._varToVAddrs[varId] = getVirtualMemAddress(varId);
+        _es->globalConsES->_varToVAddrs[varId] = getVirtualMemAddress(varId);
     }
 }
 
@@ -786,21 +788,21 @@ void SVFIR2ConsExeState::moveToGlobal()
 {
     for (const auto &it: _es->_varToVal)
     {
-        ConsExeState::globalConsES._varToVal.insert(it);
+        ConsExeState::globalConsES->_varToVal.insert(it);
     }
     for (const auto &it: _es->_locToVal)
     {
-        ConsExeState::globalConsES._locToVal.insert(it);
+        ConsExeState::globalConsES->_locToVal.insert(it);
     }
     for (const auto &it: _es->_varToVAddrs)
     {
-        ConsExeState::globalConsES._varToVAddrs.insert(it);
+        ConsExeState::globalConsES->_varToVAddrs.insert(it);
     }
     for (const auto &it: _es->_locToVAddrs)
     {
-        ConsExeState::globalConsES._locToVAddrs.insert(it);
+        ConsExeState::globalConsES->_locToVAddrs.insert(it);
     }
-    ConsExeState::globalConsES._varToVAddrs[0] = ConsExeState::getVirtualMemAddress(0);
+    ConsExeState::globalConsES->_varToVAddrs[0] = ConsExeState::getVirtualMemAddress(0);
     _es->_varToVal.clear();
     _es->_locToVal.clear();
     _es->_varToVAddrs.clear();
