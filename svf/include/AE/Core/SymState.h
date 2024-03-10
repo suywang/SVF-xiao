@@ -31,6 +31,37 @@
 
 namespace SVF
 {
+enum class TypeState {
+    Uinit = 0,
+    Error,
+    Allocated,
+    Freed,
+    Opened,
+    Unknown
+};
+
+class TypeStateParser {
+public:
+    static Map<std::string, TypeState> _typeMap;
+    static Map<TypeState, std::string> _revTypeMap;
+
+    static TypeState fromString(const std::string &str) {
+        auto it = _typeMap.find(str);
+        if (it == _typeMap.end())
+            return TypeState::Unknown;
+        else
+            return it->second;
+    }
+
+    static std::string toString(const TypeState& typeState) {
+        auto it = _revTypeMap.find(typeState);
+        if (it == _revTypeMap.end())
+            return "Unknown";
+        else
+            return it->second;
+    }
+};
+
 /*!
  * Symbolic state
  *
@@ -40,7 +71,6 @@ class SymState
 {
 
 public:
-    typedef std::string TypeState;
     typedef std::vector<u32_t> KeyNodes;
     typedef Set<KeyNodes> KeyNodesSet;
 
@@ -55,7 +85,7 @@ private:
 
 public:
     /// Constructor
-    SymState() : _exeState(ConsExeState::nullExeState()), _typeState("") {}
+    SymState() : _exeState(ConsExeState::nullExeState()), _typeState(TypeState::Unknown) {}
 
     /// Constructor
     SymState(ConsExeState _es, TypeState _as);
@@ -196,7 +226,7 @@ public:
 
     inline bool isNullSymState() const
     {
-        return getExecutionState().isNullState() && getAbstractState().empty();
+        return getExecutionState().isNullState() && getAbstractState() == TypeState::Unknown;
     }
 
 };
@@ -212,7 +242,7 @@ struct std::hash<SVF::SymState>
     size_t operator()(const SVF::SymState &symState) const
     {
 
-        SVF::Hash<std::pair<SVF::SymState::TypeState, SVF::ConsExeState>> pairH;
+        SVF::Hash<std::pair<SVF::TypeState, SVF::ConsExeState>> pairH;
 
         return pairH(make_pair(symState.getAbstractState(), symState.getExecutionState()));
     }

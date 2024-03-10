@@ -54,19 +54,19 @@ public:
     typedef Map<u32_t, SingleAbsValue> VarToValMap;
     typedef VarToValMap LocToValMap;
 
-    static ConsExeState globalConsES;
+    static ConsExeState* globalConsES;
 
 public:
     ConsExeState(): ExeState(ExeState::SingleValueK) {}
 
 
     /// Constructor
-    ConsExeState(VarToValMap varToValMap, LocToValMap locToValMap) : ExeState(ExeState::SingleValueK), _varToVal(
-            SVFUtil::move(varToValMap)), _locToVal(SVFUtil::move(locToValMap))  {}
+    ConsExeState(VarToValMap varToValMap, LocToValMap locToValMap, Z3Expr brCond) : ExeState(ExeState::SingleValueK), _varToVal(
+            SVFUtil::move(varToValMap)), _locToVal(SVFUtil::move(locToValMap)), _brCond(SVFUtil::move(brCond))  {}
 
     /// Copy Constructor
     ConsExeState(const ConsExeState &rhs) : ExeState(rhs), _varToVal(rhs.getVarToVal()),
-        _locToVal(rhs.getLocToVal())
+        _locToVal(rhs.getLocToVal()), _brCond(rhs._brCond)
     {
 
     }
@@ -83,7 +83,7 @@ public:
 
     /// Move Constructor
     ConsExeState(ConsExeState &&rhs) noexcept: ExeState(std::move(rhs)),
-        _varToVal(SVFUtil::move(rhs._varToVal)), _locToVal(SVFUtil::move(rhs._locToVal))
+        _varToVal(SVFUtil::move(rhs._varToVal)), _locToVal(SVFUtil::move(rhs._locToVal)), _brCond(SVFUtil::move(rhs._brCond))
     {
 
     }
@@ -94,7 +94,7 @@ public:
     /// Name
     static inline std::string name()
     {
-        return "ConstantExpr";
+        return "Constant Execution State";
     }
 
     using ExeState::operator==;
@@ -115,22 +115,25 @@ protected:
 
     VarToValMap _varToVal; ///< Map a variable (symbol) to its constant value
     LocToValMap _locToVal; ///< Map a memory address to its stored constant value
+    Z3Expr _brCond;
 
 public:
 
     /// get memory addresses of variable
     virtual Addrs &getAddrs(u32_t id) override
     {
-        auto it = globalConsES._varToAddrs.find(id);
-        if (it != globalConsES._varToAddrs.end()) return it->second;
+        assert(globalConsES && "global es not initialized?");
+        auto it = globalConsES->_varToAddrs.find(id);
+        if (it != globalConsES->_varToAddrs.end()) return it->second;
         return _varToAddrs[id];
     }
 
     /// get constant value of variable
     inline SingleAbsValue &operator[](u32_t varId)
     {
-        auto it = globalConsES._varToVal.find(varId);
-        if (it != globalConsES._varToVal.end())
+        assert(globalConsES && "global es not initialized?");
+        auto it = globalConsES->_varToVal.find(varId);
+        if (it != globalConsES->_varToVal.end())
             return it->second;
         else
             return _varToVal[varId];
@@ -139,26 +142,30 @@ public:
     /// whether the variable is in varToAddrs table
     virtual inline bool inVarToAddrsTable(u32_t id) const override
     {
+        assert(globalConsES && "global es not initialized?");
         return _varToAddrs.find(id) != _varToAddrs.end() ||
-               globalConsES._varToAddrs.find(id) != globalConsES._varToAddrs.end();
+               globalConsES->_varToAddrs.find(id) != globalConsES->_varToAddrs.end();
     }
 
     /// whether the variable is in varToVal table
     inline bool inVarToValTable(u32_t varId) const
     {
-        return _varToVal.count(varId) || globalConsES._varToVal.count(varId);
+        assert(globalConsES && "global es not initialized?");
+        return _varToVal.count(varId) || globalConsES->_varToVal.count(varId);
     }
 
     /// whether the memory address stores memory addresses
     virtual inline bool inLocToAddrsTable(u32_t id) const override
     {
-        return globalConsES._locToAddrs.find(id) != globalConsES._locToAddrs.end() || inLocalLocToAddrsTable(id);
+        assert(globalConsES && "global es not initialized?");
+        return globalConsES->_locToAddrs.find(id) != globalConsES->_locToAddrs.end() || inLocalLocToAddrsTable(id);
     }
 
     /// whether the memory address stores constant value
     inline bool inLocToValTable(u32_t varId) const
     {
-        return inLocalLocToValTable(varId) || globalConsES._locToVal.count(varId);
+        assert(globalConsES && "global es not initialized?");
+        return inLocalLocToValTable(varId) || globalConsES->_locToVal.count(varId);
     }
 
     inline const VarToValMap &getVarToVal() const
@@ -197,6 +204,28 @@ public:
     /// Update symbolic states based on the summary/side-effect of callee
     void applySummary(const ConsExeState &summary);
 
+    static inline z3::context &getContext() {
+        return Z3Expr::getContext();
+    }
+
+    /// Get z3 context, singleton design here to make sure we only have one context
+    static inline z3::solver &getSolver() {
+        return Z3Expr::getSolver();
+    }
+
+    static inline z3::check_result solverCheck(const Z3Expr &e) {
+        Z3Expr::getSolver().push();
+        Z3Expr::getSolver().add(e.getExpr());
+        z3::check_result res = Z3Expr::getSolver().check();
+        Z3Expr::getSolver().pop();
+        return res;
+    }
+
+    /// Whether path constraint is satisfiable
+    inline bool isSatisfiable() const {
+        return solverCheck(_brCond) != z3::unsat;
+    }
+
     inline bool equalVar(u32_t lhs, u32_t rhs)
     {
         if (!inVarToValTable(lhs) || !inVarToValTable(rhs)) return false;
@@ -206,7 +235,7 @@ public:
     /// Whether state is null state (uninitialized state)
     inline bool isNullState() const
     {
-        return _varToVal.size() == 1 && eq((*_varToVal.begin()).second, -1) && _locToVal.empty();
+        return _varToVal.size() == 1 && eq((*_varToVal.begin()).second, -1) && _locToVal.empty() && eq(_brCond, Z3Expr::nullExpr());
     }
 
     /// Print values of all expressions
@@ -229,6 +258,7 @@ public:
 
     virtual Addrs &loadAddrs(u32_t addr) override
     {
+        assert(globalConsES && "global es not initialized?");
         assert(isVirtualMemAddress(addr) && "not virtual address?");
         u32_t objId = getInternalID(addr);
         auto it = _locToAddrs.find(objId);
@@ -238,8 +268,8 @@ public:
         }
         else
         {
-            auto globIt = globalConsES._locToAddrs.find(objId);
-            if (globIt != globalConsES._locToAddrs.end())
+            auto globIt = globalConsES->_locToAddrs.find(objId);
+            if (globIt != globalConsES->_locToAddrs.end())
             {
                 return globIt->second;
             }
@@ -252,12 +282,13 @@ public:
 
     virtual std::string varToAddrs(u32_t varId) const override
     {
+        assert(globalConsES && "global es not initialized?");
         std::stringstream exprName;
         auto it = _varToAddrs.find(varId);
         if (it == _varToAddrs.end())
         {
-            auto git = globalConsES._varToAddrs.find(varId);
-            if (git == globalConsES._varToAddrs.end())
+            auto git = globalConsES->_varToAddrs.find(varId);
+            if (git == globalConsES->_varToAddrs.end())
                 exprName << "Var not in varToAddrs!\n";
             else
             {
@@ -299,12 +330,13 @@ public:
 
     virtual std::string locToAddrs(u32_t objId) const override
     {
+        assert(globalConsES && "global es not initialized?");
         std::stringstream exprName;
         auto it = _locToAddrs.find(objId);
         if (it == _locToAddrs.end())
         {
-            auto git = globalConsES._locToAddrs.find(objId);
-            if (git == globalConsES._locToAddrs.end())
+            auto git = globalConsES->_locToAddrs.find(objId);
+            if (git == globalConsES->_locToAddrs.end())
                 exprName << "Obj not in locToVal!\n";
             else
             {
@@ -348,7 +380,7 @@ public:
     static inline ConsExeState initExeState()
     {
         VarToValMap mp;
-        ConsExeState exeState(mp, SVFUtil::move(mp));
+        ConsExeState exeState(mp, SVFUtil::move(mp), Z3Expr::getTrueCond());
         return SVFUtil::move(exeState);
     }
 
@@ -356,9 +388,18 @@ public:
     static inline ConsExeState nullExeState()
     {
         VarToValMap mp;
-        ConsExeState exeState(mp, SVFUtil::move(mp));
+        ConsExeState exeState(mp, SVFUtil::move(mp), Z3Expr::nullExpr());
         exeState._varToVal[NullptrID] = -1;
         return SVFUtil::move(exeState);
+    }
+
+    inline const Z3Expr &getBrCond() const
+    {
+        return _brCond;
+    }
+
+    inline void setBrCond(const Z3Expr& brCond) {
+        _brCond = brCond.simplify();
     }
 
 public:

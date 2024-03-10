@@ -32,7 +32,7 @@ using namespace SVF;
 using namespace SVFUtil;
 
 
-ConsExeState ConsExeState::globalConsES(initExeState());
+ConsExeState* ConsExeState::globalConsES = nullptr;
 
 /*!
  * Copy operator
@@ -45,6 +45,7 @@ ConsExeState &ConsExeState::operator=(const ConsExeState &rhs)
     {
         _varToVal = rhs.getVarToVal();
         _locToVal = rhs.getLocToVal();
+        _brCond = rhs._brCond;
         ExeState::operator=(rhs);
     }
     return *this;
@@ -61,6 +62,7 @@ ConsExeState &ConsExeState::operator=(ConsExeState &&rhs) noexcept
     {
         _varToVal = SVFUtil::move(rhs._varToVal);
         _locToVal = SVFUtil::move(rhs._locToVal);
+        _brCond = SVFUtil::move(rhs._brCond);
         ExeState::operator=(std::move(rhs));
     }
     return *this;
@@ -74,7 +76,7 @@ ConsExeState &ConsExeState::operator=(ConsExeState &&rhs) noexcept
 bool ConsExeState::operator==(const ConsExeState &rhs) const
 {
     // if values of variables are not changed, fix-point is reached
-    return ExeState::operator==(rhs) && eqVarToValMap(_varToVal, rhs.getVarToVal()) &&
+    return ExeState::operator==(rhs) && eq(_brCond, rhs._brCond) && eqVarToValMap(_varToVal, rhs.getVarToVal()) &&
            eqVarToValMap(_locToVal, rhs.getLocToVal());
 }
 
@@ -111,7 +113,7 @@ u32_t ConsExeState::hash() const
     }
     SVF::Hash<std::pair<SVF::u32_t, SVF::u32_t>> pairH;
 
-    return pairH(std::make_pair(bas, pairH(std::make_pair(h, h2))));
+    return pairH(std::make_pair(pairH(std::make_pair(bas, pairH(std::make_pair(h, h2)))), getBrCond().id()));
 }
 
 /*!
@@ -142,6 +144,11 @@ void ConsExeState::buildGlobES(ConsExeState &globES, Set<u32_t> &vars)
 bool ConsExeState::joinWith(const SVF::ConsExeState &rhs)
 {
     bool changed = ExeState::joinWith(rhs);
+    const Z3Expr &expr = Z3Expr::OR(getBrCond(), rhs.getBrCond());
+    if (!eq(getBrCond(), expr)) {
+        changed = true;
+        setBrCond(expr);
+    }
     for (const auto &rhsItem: rhs._varToVal)
     {
         auto it = _varToVal.find(rhsItem.first);
@@ -250,6 +257,7 @@ void ConsExeState::printExprValues() const
 {
     std::cout << "\n";
     std::cout.flags(std::ios::left);
+    std::cout << "\tPath Constraint: " << _brCond << "\n";
     std::cout << "\t-----------------Var and Value-----------------\n";
     for (const auto &item: getVarToVal())
     {
@@ -290,6 +298,7 @@ void ConsExeState::printExprValues(std::ostream &oss) const
 {
     oss << "\n";
     oss.flags(std::ios::left);
+    std::cout << "\tPath Constraint: " << _brCond << "\n";
     oss << "\t-----------------Var and Value-----------------\n";
     for (const auto &item: getVarToVal())
     {
@@ -330,6 +339,7 @@ std::string ConsExeState::pcToString() const
 {
     std::stringstream exprName;
     exprName << "Path Constraint:\n";
+    exprName << _brCond.to_string() << "\n";
     return SVFUtil::move(exprName.str());
 }
 
@@ -339,8 +349,8 @@ std::string ConsExeState::varToString(u32_t valId) const
     auto it = getVarToVal().find(valId);
     if (it == getVarToVal().end())
     {
-        auto it2 = globalConsES._varToVal.find(valId);
-        if (it2 == globalConsES._varToVal.end())
+        auto it2 = globalConsES->_varToVal.find(valId);
+        if (it2 == globalConsES->_varToVal.end())
         {
             exprName << "Var not in varToVal!\n";
         }
@@ -571,6 +581,7 @@ bool ConsExeState::lessThanVarToValMap(const VarToValMap &lhs, const VarToValMap
 
 SingleAbsValue ConsExeState::load(u32_t objId)
 {
+    assert(globalConsES && "global es not initialized?");
     auto it = _locToVal.find(objId);
     if (it != _locToVal.end())
     {
@@ -578,8 +589,8 @@ SingleAbsValue ConsExeState::load(u32_t objId)
     }
     else
     {
-        auto globIt = globalConsES._locToVal.find(objId);
-        if (globIt != globalConsES._locToVal.end())
+        auto globIt = globalConsES->_locToVal.find(objId);
+        if (globIt != globalConsES->_locToVal.end())
             return globIt->second;
         else
         {
