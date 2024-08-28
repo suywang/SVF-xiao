@@ -1,5 +1,6 @@
 #include "SVFIR/SVFValue.h"
 #include "Util/SVFUtil.h"
+#include <functional>
 
 using namespace SVF;
 using namespace SVFUtil;
@@ -157,10 +158,10 @@ bool SVFLoopAndDomInfo::isLoopHeader(const SVFBasicBlock* bb) const
 
 SVFFunction::SVFFunction(const SVFType* ty, const SVFFunctionType* ft,
                          bool declare, bool intrinsic, bool adt, bool varg,
-                         SVFLoopAndDomInfo* ld)
+                         SVFLoopAndDomInfo* ld, SVFLoopAndDomInfo* svfld)
     : SVFValue(ty, SVFValue::SVFFunc), isDecl(declare), intrinsic(intrinsic),
       addrTaken(adt), isUncalled(false), isNotRet(false), varArg(varg),
-      funcType(ft), loopAndDom(ld), realDefFun(nullptr), exitBlock(nullptr)
+      funcType(ft), loopAndDom(ld), svfLoopAndDom(svfld), realDefFun(nullptr), exitBlock(nullptr)
 {
 }
 
@@ -171,6 +172,7 @@ SVFFunction::~SVFFunction()
     for(const SVFArgument* arg : allArgs)
         delete arg;
     delete loopAndDom;
+    delete svfLoopAndDom;
 }
 
 u32_t SVFFunction::arg_size() const
@@ -274,3 +276,10 @@ SVFInstruction::SVFInstruction(const SVFType* ty, const SVFBasicBlock* b,
     : SVFValue(ty, k), bb(b), terminator(tm), ret(isRet)
 {
 }
+
+
+
+void SVFFunction::initDomTree() {
+    dominatorAnalysis.analyze();
+}
+

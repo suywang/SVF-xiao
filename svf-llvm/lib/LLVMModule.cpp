@@ -241,7 +241,7 @@ void LLVMModuleSet::createSVFFunction(const Function* func)
         SVFUtil::cast<SVFFunctionType>(
             getSVFType(func->getFunctionType())),
         func->isDeclaration(), LLVMUtil::isIntrinsicFun(func),
-        func->hasAddressTaken(), func->isVarArg(), new SVFLoopAndDomInfo);
+        func->hasAddressTaken(), func->isVarArg(), new SVFLoopAndDomInfo, new SVFLoopAndDomInfo);
     svfModule->addFunctionSet(svfFunc);
     if (ExtFun2Annotations.find(func) != ExtFun2Annotations.end())
         svfFunc->setAnnotations(ExtFun2Annotations[func]);
@@ -308,9 +308,22 @@ void LLVMModuleSet::initSVFFunction()
             if (!SVFUtil::isExtCall(svffun))
             {
                 initDomTree(svffun, &f);
+                svffun->initDomTree();
             }
         }
     }
+}
+
+bool areConnectedByUnwindEdge(const llvm::BasicBlock *BB1, const llvm::BasicBlock *BB2) {
+    for (const llvm::Instruction &I : *BB1) {
+        if (const auto *Invoke = llvm::dyn_cast<llvm::InvokeInst>(&I)) {
+            const llvm::BasicBlock *UnwindDest = Invoke->getUnwindDest();
+            if (UnwindDest == BB2) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 void LLVMModuleSet::initSVFBasicBlock(const Function* func)
@@ -401,6 +414,7 @@ void LLVMModuleSet::initDomTree(SVFFunction* svffun, const Function* fun)
     df.analyze(dt);
     LoopInfo loopInfo = LoopInfo(dt);
     PostDominatorTree pdt = PostDominatorTree(const_cast<Function&>(*fun));
+    pdt.recalculate(const_cast<Function&>(*fun));
     SVFLoopAndDomInfo* ld = svffun->getLoopAndDomInfo();
 
     Map<const SVFBasicBlock*,Set<const SVFBasicBlock*>> & dfBBsMap = ld->getDomFrontierMap();
@@ -424,11 +438,10 @@ void LLVMModuleSet::initDomTree(SVFFunction* svffun, const Function* fun)
         SVFBasicBlock* svfBB = getSVFBasicBlock(&bb);
         if (DomTreeNode* dtNode = dt.getNode(&bb))
         {
-            SVFLoopAndDomInfo::BBSet& bbSet = ld->getDomTreeMap()[svfBB];
             for (const auto domBB : *dtNode)
             {
                 const auto* domSVFBB = getSVFBasicBlock(domBB->getBlock());
-                bbSet.insert(domSVFBB);
+                ld->getDomTreeMap()[svfBB].insert(domSVFBB);
             }
         }
 
@@ -437,14 +450,13 @@ void LLVMModuleSet::initDomTree(SVFFunction* svffun, const Function* fun)
             u32_t level = pdtNode->getLevel();
             ld->getBBPDomLevel()[svfBB] = level;
             BasicBlock* idomBB = pdtNode->getIDom()->getBlock();
-            const SVFBasicBlock* idom = idomBB == NULL ? NULL: getSVFBasicBlock(idomBB);
-            ld->getBB2PIdom()[svfBB] = idom;
+            if(idomBB)
+                ld->getBB2PIdom()[svfBB] = getSVFBasicBlock(idomBB);
 
-            SVFLoopAndDomInfo::BBSet& bbSet = ld->getPostDomTreeMap()[svfBB];
             for (const auto domBB : *pdtNode)
             {
                 const auto* domSVFBB = getSVFBasicBlock(domBB->getBlock());
-                bbSet.insert(domSVFBB);
+                ld->getPostDomTreeMap()[svfBB].insert(domSVFBB);
             }
         }
 

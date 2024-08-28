@@ -33,6 +33,7 @@
 #include "SVFIR/SVFType.h"
 #include "Graphs/GraphPrinter.h"
 #include "Util/Casting.h"
+#include "Util/DominantorAnalysis.h"
 
 namespace SVF
 {
@@ -54,13 +55,14 @@ class SVFLoopAndDomInfo
 public:
     typedef Set<const SVFBasicBlock*> BBSet;
     typedef std::vector<const SVFBasicBlock*> BBList;
+    typedef Map<const SVFBasicBlock*,BBSet> DominatorMap;
     typedef BBList LoopBBs;
 
 private:
     BBList reachableBBs;    ///< reachable BasicBlocks from the function entry.
-    Map<const SVFBasicBlock*,BBSet> dtBBsMap;   ///< map a BasicBlock to BasicBlocks it Dominates
-    Map<const SVFBasicBlock*,BBSet> pdtBBsMap;   ///< map a BasicBlock to BasicBlocks it PostDominates
-    Map<const SVFBasicBlock*,BBSet> dfBBsMap;    ///< map a BasicBlock to its Dominate Frontier BasicBlocks
+    DominatorMap dtBBsMap;   ///< map a BasicBlock to BasicBlocks it Dominates
+    DominatorMap pdtBBsMap;   ///< map a BasicBlock to BasicBlocks it PostDominates
+    DominatorMap dfBBsMap;    ///< map a BasicBlock to its Dominate Frontier BasicBlocks
     Map<const SVFBasicBlock*, LoopBBs> bb2LoopMap;  ///< map a BasicBlock (if it is in a loop) to all the BasicBlocks in this loop
     Map<const SVFBasicBlock*, u32_t> bb2PdomLevel;  ///< map a BasicBlock to its level in pdom tree, used in findNearestCommonPDominator
     Map<const SVFBasicBlock*, const SVFBasicBlock*> bb2PIdom;  ///< map a BasicBlock to its immediate dominator in pdom tree, used in findNearestCommonPDominator
@@ -300,12 +302,14 @@ class SVFFunction : public SVFValue
     friend class SVFIRWriter;
     friend class SVFIRReader;
     friend class SVFIRBuilder;
+    friend class DominatorAnalysis;
 
 public:
     typedef std::vector<const SVFBasicBlock*>::const_iterator const_iterator;
     typedef SVFLoopAndDomInfo::BBSet BBSet;
     typedef SVFLoopAndDomInfo::BBList BBList;
     typedef SVFLoopAndDomInfo::LoopBBs LoopBBs;
+    typedef DominatorAnalysis::DominatorMap DominatorMap;
 
 private:
     bool isDecl;   /// return true if this function does not have a body
@@ -316,12 +320,13 @@ private:
     bool varArg;    /// return true if this function supports variable arguments
     const SVFFunctionType* funcType; /// FunctionType, which is different from the type (PointerType) of this SVFFunction
     SVFLoopAndDomInfo* loopAndDom;  /// the loop and dominate information
+    SVFLoopAndDomInfo* svfLoopAndDom;  /// the loop and dominate information
     const SVFFunction* realDefFun;  /// the definition of a function across multiple modules
     std::vector<const SVFBasicBlock*> allBBs;   /// all BasicBlocks of this function
     std::vector<const SVFArgument*> allArgs;    /// all formal arguments of this function
     std::vector<std::string> annotations; /// annotations of this function
     SVFBasicBlock *exitBlock;             /// a 'single' basic block having no successors and containing return instruction in a function
-
+    DominatorAnalysis dominatorAnalysis{this};
 protected:
     ///@{ attributes to be set only through Module builders e.g., LLVMModule
     inline void addBasicBlock(const SVFBasicBlock* bb)
@@ -350,8 +355,10 @@ protected:
     }
     /// @}
 
+    void initDomTree();
+
 public:
-    SVFFunction(const SVFType* ty,const SVFFunctionType* ft, bool declare, bool intrinsic, bool addrTaken, bool varg, SVFLoopAndDomInfo* ld);
+    SVFFunction(const SVFType* ty,const SVFFunctionType* ft, bool declare, bool intrinsic, bool addrTaken, bool varg, SVFLoopAndDomInfo* ld, SVFLoopAndDomInfo* svfld);
     SVFFunction(void) = delete;
     virtual ~SVFFunction();
 
@@ -523,6 +530,8 @@ public:
         return loopAndDom->postDominate(bbKey,bbValue);
     }
 };
+
+
 
 class ICFGNode;
 
