@@ -278,12 +278,8 @@ void LLVMModuleSet::createSVFFunction(const Function* func)
 
     for (const Argument& arg : func->args())
     {
-        SVFArgument* svfarg = new SVFArgument(
-            getSVFType(arg.getType()), svfFunc, arg.getArgNo(),
-            LLVMUtil::isArgOfUncalledFunction(&arg));
-        // Setting up arg name
-        if (!arg.hasName())
-            svfarg->setName(std::to_string(arg.getArgNo()));
+        SVFLLVMValue* svfarg = new SVFLLVMValue(
+            getSVFType(arg.getType()));
 
         addArgumentMap(&arg, svfarg);
     }

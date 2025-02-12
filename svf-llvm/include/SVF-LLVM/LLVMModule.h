@@ -58,7 +58,7 @@ public:
     typedef Map<const Function*, FunObjVar*> LLVMFun2FunObjVarMap;
     typedef Map<const BasicBlock*, SVFBasicBlock*> LLVMBB2SVFBBMap;
     typedef Map<const Instruction*, SVFInstruction*> LLVMInst2SVFInstMap;
-    typedef Map<const Argument*, SVFArgument*> LLVMArgument2SVFArgumentMap;
+    typedef Map<const Argument*, SVFLLVMValue*> LLVMArgument2SVFArgumentMap;
     typedef Map<const Constant*, SVFConstant*> LLVMConst2SVFConstMap;
     typedef Map<const Value*, SVFOtherValue*> LLVMValue2SVFOtherValueMap;
     typedef Map<const SVFLLVMValue*, const Value*> SVFValue2LLVMValueMap;
@@ -254,7 +254,7 @@ public:
         addToSVFVar2LLVMValueMap(inst, svfInst);
     }
 
-    inline void addArgumentMap(const Argument* arg, SVFArgument* svfArg)
+    inline void addArgumentMap(const Argument* arg, SVFLLVMValue* svfArg)
     {
         LLVMArgument2SVFArgument[arg] = svfArg;
         setValueAttr(arg,svfArg);
@@ -353,7 +353,7 @@ public:
         return it->second;
     }
 
-    inline SVFArgument* getSVFArgument(const Argument* arg) const
+    inline SVFLLVMValue* getSVFArgument(const Argument* arg) const
     {
         LLVMArgument2SVFArgumentMap::const_iterator it = LLVMArgument2SVFArgument.find(arg);
         assert(it!=LLVMArgument2SVFArgument.end() && "SVF Argument not found!");

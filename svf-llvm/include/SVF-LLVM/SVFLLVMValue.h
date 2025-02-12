@@ -68,7 +68,6 @@ public:
         SVFCall,
         SVFVCall,
         SVFGlob,
-        SVFArg,
         SVFConst,
         SVFConstData,
         SVFMetaAsValue,
@@ -85,7 +84,7 @@ protected:
     std::string name;       ///< Short name of value for printing & debugging
     std::string sourceLoc;  ///< Source code information of this value
     /// Constructor without name
-    SVFLLVMValue(const SVFType* ty, SVFValKind k)
+    SVFLLVMValue(const SVFType* ty, SVFValKind k = SVFVal)
         : kind(k), ptrInUncalledFun(false),
           constDataOrAggData(SVFConstData == k), type(ty), sourceLoc("NoLoc")
     {
@@ -557,46 +556,6 @@ public:
     static inline bool classof(const SVFConstant *node)
     {
         return node->getKind() == SVFGlob;
-    }
-};
-
-class SVFArgument : public SVFLLVMValue
-{
-    friend class SVFIRWriter;
-    friend class SVFIRReader;
-private:
-    const SVFFunction* fun;
-    u32_t argNo;
-    bool uncalled;
-public:
-    SVFArgument(const SVFType* ty, const SVFFunction* fun, u32_t argNo,
-                bool uncalled)
-        : SVFLLVMValue(ty, SVFLLVMValue::SVFArg), fun(fun), argNo(argNo),
-          uncalled(uncalled)
-    {
-    }
-    SVFArgument() = delete;
-
-    inline const SVFFunction* getParent() const
-    {
-        return fun;
-    }
-
-    ///  Return the index of this formal argument in its containing function.
-    /// For example in "void foo(int a, float b)" a is 0 and b is 1.
-    inline u32_t getArgNo() const
-    {
-        return argNo;
-    }
-
-    inline bool isArgOfUncalledFunction() const
-    {
-        return uncalled;
-    }
-
-    static inline bool classof(const SVFLLVMValue *node)
-    {
-        return node->getKind() == SVFArg;
     }
 };
 

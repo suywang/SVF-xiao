@@ -1569,11 +1569,11 @@ void SVFIRBuilder::setCurrentBBAndValueForPAGEdge(PAGEdge* edge)
                 icfgNode = llvmMS->getICFGNode(SVFUtil::cast<Instruction>(llvmMS->getLLVMValue(curInst)));
         }
     }
-    else if (const SVFArgument* arg = SVFUtil::dyn_cast<SVFArgument>(curVal))
+    else if (const Argument* arg = SVFUtil::dyn_cast<Argument>(llvmModuleSet()->getLLVMValue(curVal)))
     {
         assert(curBB && (curBB->getParent()->getEntryBlock() == curBB));
         icfgNode = pag->getICFG()->getFunEntryICFGNode(
-                       llvmModuleSet()->getFunObjVar(SVFUtil::cast<Function>(llvmModuleSet()->getLLVMValue(arg->getParent()))));
+                       llvmModuleSet()->getFunObjVar(SVFUtil::cast<Function>(arg->getParent())));
     }
     else if (SVFUtil::isa<SVFConstant>(curVal) ||
              SVFUtil::isa<SVFFunction>(curVal) ||
