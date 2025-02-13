@@ -288,9 +288,7 @@ void LLVMModuleSet::createSVFFunction(const Function* func)
         addBasicBlock(svfFunc, &bb);
         for (const Instruction& inst : bb)
         {
-            SVFInstruction* svfInst = new SVFInstruction(getSVFType(inst.getType()),
-                                       getSVFBasicBlock(&bb), inst.isTerminator(),
-                                       SVFUtil::isa<ReturnInst>(inst));
+            SVFLLVMValue* svfInst = new SVFLLVMValue(getSVFType(inst.getType()));
 
             addInstructionMap(&inst, svfInst);
         }
