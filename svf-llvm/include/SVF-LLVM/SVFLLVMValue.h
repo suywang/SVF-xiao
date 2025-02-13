@@ -64,9 +64,7 @@ public:
         SVFVal,
         SVFFunc,
         SVFInst,
-        SVFGlob,
-        SVFConst,
-        SVFConstData
+        SVFConst
     };
 
 private:
@@ -81,7 +79,7 @@ protected:
     /// Constructor without name
     SVFLLVMValue(const SVFType* ty, SVFValKind k = SVFVal)
         : kind(k), ptrInUncalledFun(false),
-          constDataOrAggData(SVFConstData == k), type(ty), sourceLoc("NoLoc")
+          constDataOrAggData(false), type(ty), sourceLoc("NoLoc")
     {
     }
 
@@ -430,9 +428,7 @@ public:
 
     static inline bool classof(const SVFLLVMValue *node)
     {
-        return node->getKind() == SVFConst ||
-               node->getKind() == SVFGlob ||
-               node->getKind() == SVFConstData;
+        return node->getKind() == SVFConst;
     }
 
 };
