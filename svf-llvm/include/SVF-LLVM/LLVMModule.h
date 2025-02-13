@@ -59,7 +59,7 @@ public:
     typedef Map<const BasicBlock*, SVFBasicBlock*> LLVMBB2SVFBBMap;
     typedef Map<const Instruction*, SVFInstruction*> LLVMInst2SVFInstMap;
     typedef Map<const Argument*, SVFLLVMValue*> LLVMArgument2SVFArgumentMap;
-    typedef Map<const Constant*, SVFConstant*> LLVMConst2SVFConstMap;
+    typedef Map<const Constant*, SVFLLVMValue*> LLVMConst2SVFConstMap;
     typedef Map<const Value*, SVFLLVMValue*> LLVMValue2SVFOtherValueMap;
     typedef Map<const SVFLLVMValue*, const Value*> SVFValue2LLVMValueMap;
     typedef Map<const SVFValue*, const Value*> SVFBaseNode2LLVMValueMap;
@@ -269,7 +269,7 @@ public:
         LLVMConst2SVFConst[glob] = svfglob;
         setValueAttr(glob,svfglob);
     }
-    inline void addConstantDataMap(const ConstantData* cd, SVFConstantData* svfcd)
+    inline void addConstantDataMap(const ConstantData* cd, SVFLLVMValue* svfcd)
     {
         LLVMConst2SVFConst[cd] = svfcd;
         setValueAttr(cd,svfcd);
@@ -373,7 +373,7 @@ public:
         return SVFUtil::cast<SVFGlobalValue>(it->second);
     }
 
-    SVFConstantData* getSVFConstantData(const ConstantData* cd);
+    SVFLLVMValue* getSVFConstantData(const ConstantData* cd);
     SVFConstant* getOtherSVFConstant(const Constant* oc);
 
     SVFLLVMValue* getSVFOtherValue(const Value* ov);

@@ -478,27 +478,6 @@ public:
     }
 };
 
-class SVFConstantData : public SVFConstant
-{
-    friend class SVFIRWriter;
-    friend class SVFIRReader;
-public:
-    SVFConstantData(const SVFType* ty, SVFValKind k = SVFConstData)
-        : SVFConstant(ty, k)
-    {
-    }
-    SVFConstantData() = delete;
-
-    static inline bool classof(const SVFLLVMValue *node)
-    {
-        return node->getKind() == SVFConstData;
-    }
-    static inline bool classof(const SVFConstantData *node)
-    {
-        return node->getKind() == SVFConstData;
-    }
-};
-
 
 /// [FOR DEBUG ONLY, DON'T USE IT UNSIDE `svf`!]
 /// Converts an SVFValue to corresponding LLVM::Value, then get the string

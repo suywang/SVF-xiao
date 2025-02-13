@@ -1276,17 +1276,17 @@ void LLVMModuleSet::addToSVFVar2LLVMValueMap(const Value* val,
     svfBaseNode->setName(val->getName().str());
 }
 
-SVFConstantData* LLVMModuleSet::getSVFConstantData(const ConstantData* cd)
+SVFLLVMValue* LLVMModuleSet::getSVFConstantData(const ConstantData* cd)
 {
     LLVMConst2SVFConstMap::const_iterator it = LLVMConst2SVFConst.find(cd);
     if(it!=LLVMConst2SVFConst.end())
     {
-        assert(SVFUtil::isa<SVFConstantData>(it->second) && "not a SVFConstantData type!");
-        return SVFUtil::cast<SVFConstantData>(it->second);
+        assert(SVFUtil::isa<SVFConstant>(it->second) && "not a SVFConstantData type!");
+        return it->second;
     }
     else
     {
-        SVFConstantData* svfcd = new SVFConstantData(getSVFType(cd->getType()));
+        SVFConstant* svfcd = new SVFConstant(getSVFType(cd->getType()));
         svfModule->addConstant(svfcd);
         addConstantDataMap(cd,svfcd);
         return svfcd;
@@ -1298,7 +1298,7 @@ SVFConstant* LLVMModuleSet::getOtherSVFConstant(const Constant* oc)
     LLVMConst2SVFConstMap::const_iterator it = LLVMConst2SVFConst.find(oc);
     if(it!=LLVMConst2SVFConst.end())
     {
-        return it->second;
+        return SVFUtil::cast<SVFConstant>(it->second);
     }
     else
     {
