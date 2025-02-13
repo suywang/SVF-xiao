@@ -1103,10 +1103,9 @@ void SVFIRBuilder::visitCallSite(CallBase* cs)
     }
     if (const Function *callee = LLVMUtil::getCallee(cs))
     {
-        const SVFFunction* svfcallee = llvmModuleSet()->getSVFFunction(callee);
-        if (LLVMUtil::isExtCall(svfcallee))
+        if (LLVMUtil::isExtCall(callee))
         {
-            handleExtCall(cs, svfcallee);
+            handleExtCall(cs, callee);
         }
         else
         {
@@ -1430,8 +1429,7 @@ void SVFIRBuilder::updateCallGraph(CallGraph* callgraph)
             if (isExtCall(*func_iter))
             {
                 setCurrentLocation(callee, callee->empty() ? nullptr : &callee->getEntryBlock());
-                const SVFFunction* svfcallee = llvmModuleSet()->getSVFFunction(callee);
-                handleExtCall(callbase, svfcallee);
+                handleExtCall(callbase, callee);
             }
             else
             {
