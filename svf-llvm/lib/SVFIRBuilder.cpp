@@ -1577,7 +1577,7 @@ void SVFIRBuilder::setCurrentBBAndValueForPAGEdge(PAGEdge* edge)
     }
     else if (SVFUtil::isa<SVFConstant>(curVal) ||
              SVFUtil::isa<SVFFunction>(curVal) ||
-             SVFUtil::isa<SVFMetadataAsValue>(curVal))
+             SVFUtil::isa<MetadataAsValue>(llvmModuleSet()->getLLVMValue(curVal)))
     {
         if (!curBB)
             pag->addGlobalPAGEdge(edge);

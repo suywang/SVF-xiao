@@ -63,13 +63,10 @@ public:
     {
         SVFVal,
         SVFFunc,
-        SVFBB,
         SVFInst,
         SVFGlob,
         SVFConst,
-        SVFConstData,
-        SVFMetaAsValue,
-        SVFOther
+        SVFConstData
     };
 
 private:
@@ -499,47 +496,6 @@ public:
     static inline bool classof(const SVFConstantData *node)
     {
         return node->getKind() == SVFConstData;
-    }
-};
-
-class SVFOtherValue : public SVFLLVMValue
-{
-    friend class SVFIRWriter;
-    friend class SVFIRReader;
-public:
-    SVFOtherValue(const SVFType* ty, SVFValKind k = SVFLLVMValue::SVFOther)
-        : SVFLLVMValue(ty, k)
-    {
-    }
-    SVFOtherValue() = delete;
-
-    static inline bool classof(const SVFLLVMValue *node)
-    {
-        return node->getKind() == SVFOther || node->getKind() == SVFMetaAsValue;
-    }
-};
-
-/*
- * This class is only for LLVM's MetadataAsValue
-*/
-class SVFMetadataAsValue : public SVFOtherValue
-{
-    friend class SVFIRWriter;
-    friend class SVFIRReader;
-public:
-    SVFMetadataAsValue(const SVFType* ty)
-        : SVFOtherValue(ty, SVFLLVMValue::SVFMetaAsValue)
-    {
-    }
-    SVFMetadataAsValue() = delete;
-
-    static inline bool classof(const SVFLLVMValue *node)
-    {
-        return node->getKind() == SVFMetaAsValue;
-    }
-    static inline bool classof(const SVFOtherValue *node)
-    {
-        return node->getKind() == SVFMetaAsValue;
     }
 };
 

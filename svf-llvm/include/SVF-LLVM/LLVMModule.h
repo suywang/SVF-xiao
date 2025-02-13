@@ -60,7 +60,7 @@ public:
     typedef Map<const Instruction*, SVFInstruction*> LLVMInst2SVFInstMap;
     typedef Map<const Argument*, SVFLLVMValue*> LLVMArgument2SVFArgumentMap;
     typedef Map<const Constant*, SVFConstant*> LLVMConst2SVFConstMap;
-    typedef Map<const Value*, SVFOtherValue*> LLVMValue2SVFOtherValueMap;
+    typedef Map<const Value*, SVFLLVMValue*> LLVMValue2SVFOtherValueMap;
     typedef Map<const SVFLLVMValue*, const Value*> SVFValue2LLVMValueMap;
     typedef Map<const SVFValue*, const Value*> SVFBaseNode2LLVMValueMap;
     typedef Map<const Type*, SVFType*> LLVMType2SVFTypeMap;
@@ -279,7 +279,7 @@ public:
         LLVMConst2SVFConst[cons] = svfcons;
         setValueAttr(cons,svfcons);
     }
-    inline void addOtherValueMap(const Value* ov, SVFOtherValue* svfov)
+    inline void addOtherValueMap(const Value* ov, SVFLLVMValue* svfov)
     {
         LLVMValue2SVFOtherValue[ov] = svfov;
         setValueAttr(ov,svfov);
@@ -376,7 +376,7 @@ public:
     SVFConstantData* getSVFConstantData(const ConstantData* cd);
     SVFConstant* getOtherSVFConstant(const Constant* oc);
 
-    SVFOtherValue* getSVFOtherValue(const Value* ov);
+    SVFLLVMValue* getSVFOtherValue(const Value* ov);
 
     /// Get the corresponding Function based on its name
     inline const SVFFunction* getSVFFunction(const std::string& name)

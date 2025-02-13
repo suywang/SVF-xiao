@@ -1309,7 +1309,7 @@ SVFConstant* LLVMModuleSet::getOtherSVFConstant(const Constant* oc)
     }
 }
 
-SVFOtherValue* LLVMModuleSet::getSVFOtherValue(const Value* ov)
+SVFLLVMValue* LLVMModuleSet::getSVFOtherValue(const Value* ov)
 {
     LLVMValue2SVFOtherValueMap::const_iterator it = LLVMValue2SVFOtherValue.find(ov);
     if(it!=LLVMValue2SVFOtherValue.end())
@@ -1318,10 +1318,7 @@ SVFOtherValue* LLVMModuleSet::getSVFOtherValue(const Value* ov)
     }
     else
     {
-        SVFOtherValue* svfov =
-            SVFUtil::isa<MetadataAsValue>(ov)
-            ? new SVFMetadataAsValue(getSVFType(ov->getType()))
-            : new SVFOtherValue(getSVFType(ov->getType()));
+        SVFLLVMValue* svfov = new SVFLLVMValue(getSVFType(ov->getType()));
         svfModule->addOtherValue(svfov);
         addOtherValueMap(ov,svfov);
         return svfov;
