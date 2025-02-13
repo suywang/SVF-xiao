@@ -39,7 +39,7 @@ SVFModule::~SVFModule()
         delete v;
     for (const SVFLLVMValue* v: AliasSet)
         delete v;
-    for (const SVFConstant* c : ConstantSet)
+    for (const SVFLLVMValue * c : ConstantSet)
         delete c;
     for (const SVFLLVMValue* o : OtherValueSet)
         delete o;

@@ -274,7 +274,7 @@ public:
         LLVMConst2SVFConst[cd] = svfcd;
         setValueAttr(cd,svfcd);
     }
-    inline void addOtherConstantMap(const Constant* cons, SVFConstant* svfcons)
+    inline void addOtherConstantMap(const Constant* cons, SVFLLVMValue* svfcons)
     {
         LLVMConst2SVFConst[cons] = svfcons;
         setValueAttr(cons,svfcons);
@@ -373,7 +373,7 @@ public:
     }
 
     SVFLLVMValue* getSVFConstantData(const ConstantData* cd);
-    SVFConstant* getOtherSVFConstant(const Constant* oc);
+    SVFLLVMValue* getOtherSVFConstant(const Constant* oc);
 
     SVFLLVMValue* getSVFOtherValue(const Value* ov);
 

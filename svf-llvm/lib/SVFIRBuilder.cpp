@@ -1575,9 +1575,9 @@ void SVFIRBuilder::setCurrentBBAndValueForPAGEdge(PAGEdge* edge)
         icfgNode = pag->getICFG()->getFunEntryICFGNode(
                        llvmModuleSet()->getFunObjVar(SVFUtil::cast<Function>(arg->getParent())));
     }
-    else if (SVFUtil::isa<SVFConstant>(curVal) ||
+    else if (SVFUtil::isa<Constant>(llvmModuleSet()->getLLVMValue(curVal)) ||
              SVFUtil::isa<SVFFunction>(curVal) ||
-             SVFUtil::isa<MetadataAsValue, GlobalVariable>(llvmModuleSet()->getLLVMValue(curVal)))
+             SVFUtil::isa<MetadataAsValue>(llvmModuleSet()->getLLVMValue(curVal)))
     {
         if (!curBB)
             pag->addGlobalPAGEdge(edge);

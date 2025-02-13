@@ -64,7 +64,6 @@ public:
         SVFVal,
         SVFFunc,
         SVFInst,
-        SVFConst
     };
 
 private:
@@ -414,23 +413,6 @@ public:
     {
         return ret;
     }
-};
-
-class SVFConstant : public SVFLLVMValue
-{
-    friend class SVFIRWriter;
-    friend class SVFIRReader;
-public:
-    SVFConstant(const SVFType* ty, SVFValKind k = SVFConst): SVFLLVMValue(ty, k)
-    {
-    }
-    SVFConstant() = delete;
-
-    static inline bool classof(const SVFLLVMValue *node)
-    {
-        return node->getKind() == SVFConst;
-    }
-
 };
 
 

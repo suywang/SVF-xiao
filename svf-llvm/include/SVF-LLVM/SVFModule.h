@@ -46,7 +46,7 @@ public:
     typedef std::vector<const SVFFunction*> FunctionSetType;
     typedef std::vector<SVFLLVMValue*> GlobalSetType;
     typedef std::vector<SVFLLVMValue*> AliasSetType;
-    typedef std::vector<SVFConstant*> ConstantType;
+    typedef std::vector<SVFLLVMValue*> ConstantType;
     typedef std::vector<SVFLLVMValue*> OtherValueType;
 
     /// Iterators type def
@@ -94,7 +94,7 @@ public:
     {
         AliasSet.push_back(alias);
     }
-    inline void addConstant(SVFConstant* cd)
+    inline void addConstant(SVFLLVMValue* cd)
     {
         ConstantSet.push_back(cd);
     }
