@@ -1490,7 +1490,7 @@ NodeID SVFIRBuilder::getGepValVar(const Value* val, const AccessPath& ap, const 
          * 1. Instruction
          * 2. GlobalVariable
          */
-        assert((SVFUtil::isa<SVFInstruction, SVFGlobalValue>(curVal)) && "curVal not an instruction or a globalvariable?");
+        assert((SVFUtil::isa<SVFInstruction>(curVal) || SVFUtil::isa<GlobalVariable>(llvmModuleSet()->getLLVMValue(curVal))) && "curVal not an instruction or a globalvariable?");
 
         // We assume every GepValNode and its GepEdge to the baseNode are unique across the whole program
         // We preserve the current BB information to restore it after creating the gepNode
@@ -1577,7 +1577,7 @@ void SVFIRBuilder::setCurrentBBAndValueForPAGEdge(PAGEdge* edge)
     }
     else if (SVFUtil::isa<SVFConstant>(curVal) ||
              SVFUtil::isa<SVFFunction>(curVal) ||
-             SVFUtil::isa<MetadataAsValue>(llvmModuleSet()->getLLVMValue(curVal)))
+             SVFUtil::isa<MetadataAsValue, GlobalVariable>(llvmModuleSet()->getLLVMValue(curVal)))
     {
         if (!curBB)
             pag->addGlobalPAGEdge(edge);

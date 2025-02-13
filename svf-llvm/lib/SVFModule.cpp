@@ -35,6 +35,10 @@ SVFModule::~SVFModule()
 {
     for (const SVFFunction* f : FunctionSet)
         delete f;
+    for (const SVFLLVMValue* v: GlobalSet)
+        delete v;
+    for (const SVFLLVMValue* v: AliasSet)
+        delete v;
     for (const SVFConstant* c : ConstantSet)
         delete c;
     for (const SVFLLVMValue* o : OtherValueSet)

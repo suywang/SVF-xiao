@@ -437,47 +437,6 @@ public:
 
 };
 
-class SVFGlobalValue : public SVFConstant
-{
-    friend class SVFIRWriter;
-    friend class SVFIRReader;
-    friend class LLVMModuleSet;
-
-private:
-    const SVFLLVMValue* realDefGlobal;  /// the definition of a function across multiple modules
-
-protected:
-    inline void setDefGlobalForMultipleModule(const SVFLLVMValue* defg)
-    {
-        realDefGlobal = defg;
-    }
-
-public:
-    SVFGlobalValue(const SVFType* ty): SVFConstant(ty, SVFLLVMValue::SVFGlob), realDefGlobal(nullptr)
-    {
-    }
-    SVFGlobalValue(std::string&& name, const SVFType* ty) : SVFGlobalValue(ty)
-    {
-        setName(std::move(name));
-    }
-    SVFGlobalValue() = delete;
-
-    inline const SVFLLVMValue* getDefGlobalForMultipleModule() const
-    {
-        if(realDefGlobal==nullptr)
-            return this;
-        return realDefGlobal;
-    }
-    static inline bool classof(const SVFLLVMValue *node)
-    {
-        return node->getKind() == SVFGlob;
-    }
-    static inline bool classof(const SVFConstant *node)
-    {
-        return node->getKind() == SVFGlob;
-    }
-};
-
 
 /// [FOR DEBUG ONLY, DON'T USE IT UNSIDE `svf`!]
 /// Converts an SVFValue to corresponding LLVM::Value, then get the string
