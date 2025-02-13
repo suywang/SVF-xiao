@@ -289,21 +289,9 @@ void LLVMModuleSet::createSVFFunction(const Function* func)
         addBasicBlock(svfFunc, &bb);
         for (const Instruction& inst : bb)
         {
-            SVFInstruction* svfInst = nullptr;
-            if (const CallBase* call = SVFUtil::dyn_cast<CallBase>(&inst))
-            {
-                svfInst = new SVFCallInst(
-                    getSVFType(call->getType()), getSVFBasicBlock(&bb),
-                    call->getFunctionType()->isVarArg(),
-                    inst.isTerminator());
-            }
-            else
-            {
-                svfInst =
-                    new SVFInstruction(getSVFType(inst.getType()),
+            SVFInstruction* svfInst = new SVFInstruction(getSVFType(inst.getType()),
                                        getSVFBasicBlock(&bb), inst.isTerminator(),
                                        SVFUtil::isa<ReturnInst>(inst));
-            }
 
             addInstructionMap(&inst, svfInst);
         }
@@ -355,31 +343,6 @@ void LLVMModuleSet::initSVFBasicBlock(const Function* func)
                         SVFUtil::isa<ReturnInst>(bb->back())) &&
                        "last inst must be return inst");
                 svfFun->setExitBlock(svfbb);
-            }
-        }
-
-        for (BasicBlock::const_iterator iit = bb->begin(), eiit = bb->end(); iit != eiit; ++iit)
-        {
-            const Instruction* inst = &*iit;
-            if(const CallBase* call = SVFUtil::dyn_cast<CallBase>(inst))
-            {
-                SVFInstruction* svfinst = getSVFInstruction(call);
-                SVFCallInst* svfcall = SVFUtil::cast<SVFCallInst>(svfinst);
-                auto called_llvmval = call->getCalledOperand()->stripPointerCasts();
-                if (const Function* called_llvmfunc = SVFUtil::dyn_cast<Function>(called_llvmval))
-                {
-                    SVFFunction* callee = getSVFFunction(called_llvmfunc);
-                    svfcall->setCalledOperand(callee);
-                }
-                else
-                {
-                    svfcall->setCalledOperand(getSVFValue(called_llvmval));
-                }
-                for(u32_t i = 0; i < call->arg_size(); i++)
-                {
-                    SVFLLVMValue* svfval = getSVFValue(call->getArgOperand(i));
-                    svfcall->addArgument(svfval);
-                }
             }
         }
     }

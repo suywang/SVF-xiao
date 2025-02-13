@@ -65,8 +65,6 @@ public:
         SVFFunc,
         SVFBB,
         SVFInst,
-        SVFCall,
-        SVFVCall,
         SVFGlob,
         SVFConst,
         SVFConstData,
@@ -404,9 +402,7 @@ public:
 
     static inline bool classof(const SVFLLVMValue *node)
     {
-        return node->getKind() == SVFInst ||
-               node->getKind() == SVFCall ||
-               node->getKind() == SVFVCall;
+        return node->getKind() == SVFInst;
     }
 
     inline const SVFBasicBlock* getParent() const
@@ -422,80 +418,6 @@ public:
     inline bool isRetInst() const
     {
         return ret;
-    }
-};
-
-class SVFCallInst : public SVFInstruction
-{
-    friend class SVFIRWriter;
-    friend class SVFIRReader;
-    friend class LLVMModuleSet;
-    friend class SVFIRBuilder;
-
-private:
-    std::vector<const SVFLLVMValue*> args;
-    bool varArg;
-    const SVFLLVMValue* calledVal;
-
-protected:
-    ///@{ attributes to be set only through Module builders e.g., LLVMModule
-    inline void addArgument(const SVFLLVMValue* a)
-    {
-        args.push_back(a);
-    }
-    inline void setCalledOperand(const SVFLLVMValue* v)
-    {
-        calledVal = v;
-    }
-    /// @}
-
-public:
-    SVFCallInst(const SVFType* ty, const SVFBasicBlock* b, bool va, bool tm, SVFValKind k = SVFCall) :
-        SVFInstruction(ty, b, tm, false, k), varArg(va), calledVal(nullptr)
-    {
-    }
-    SVFCallInst(void) = delete;
-
-    static inline bool classof(const SVFLLVMValue *node)
-    {
-        return node->getKind() == SVFCall || node->getKind() == SVFVCall;
-    }
-    static inline bool classof(const SVFInstruction *node)
-    {
-        return node->getKind() == SVFCall || node->getKind() == SVFVCall;
-    }
-    inline u32_t arg_size() const
-    {
-        return args.size();
-    }
-    inline bool arg_empty() const
-    {
-        return args.empty();
-    }
-    inline const SVFLLVMValue* getArgOperand(u32_t i) const
-    {
-        assert(i < arg_size() && "out of bound access of the argument");
-        return args[i];
-    }
-    inline u32_t getNumArgOperands() const
-    {
-        return arg_size();
-    }
-    inline const SVFLLVMValue* getCalledOperand() const
-    {
-        return calledVal;
-    }
-    inline bool isVarArg() const
-    {
-        return varArg;
-    }
-    inline const SVFFunction* getCalledFunction() const
-    {
-        return SVFUtil::dyn_cast<SVFFunction>(calledVal);
-    }
-    inline  const FunObjVar* getCaller() const
-    {
-        return getFunction();
     }
 };
 
