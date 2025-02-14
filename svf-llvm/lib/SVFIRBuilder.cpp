@@ -69,7 +69,7 @@ SVFIR* SVFIRBuilder::build()
         return pag;
 
 
-    initialiseFunObjVars();
+    createFunObjVars();
 
     /// build icfg
     ICFGBuilder icfgbuilder;
@@ -330,7 +330,7 @@ void SVFIRBuilder::initDomTree(FunObjVar* svffun, const Function* fun)
     }
 }
 
-void SVFIRBuilder::initialiseFunObjVars()
+void SVFIRBuilder::createFunObjVars()
 {
     std::vector<FunObjVar*> funset;
     // Iterate over all object symbols in the symbol table

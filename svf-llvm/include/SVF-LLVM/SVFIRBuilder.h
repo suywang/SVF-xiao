@@ -71,13 +71,15 @@ public:
         return pag;
     }
 
+    void createFunObjVars();
+    void initFunObjVar();
+
     /// Initialize nodes and edges
     //@{
     void initialiseNodes();
     void initialiseBaseObjVars();
     void initialiseValVars();
-    void initialiseFunObjVars();
-    void initFunObjVar();
+
     void initSVFBasicBlock(const Function* func);
 
     void initDomTree(FunObjVar* func, const Function* f);
