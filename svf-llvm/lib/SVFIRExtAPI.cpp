@@ -66,7 +66,7 @@ const Type* SVFIRBuilder::getBaseTypeAndFlattenedFields(const Value* V, std::vec
             SymbolTableBuilder builder(pag);
             builder.collectSym(offset);
             NodeID id = llvmModuleSet()->getValueNode(svfOffset);
-            pag->addConstantIntValNode(id, LLVMUtil::getIntegerValue(offset), nullptr, svfOffset->getType());
+            pag->addConstantIntValNode(id, LLVMUtil::getIntegerValue(offset), nullptr, llvmModuleSet()->getSVFType(offset->getType()));
             llvmModuleSet()->addToSVFVar2LLVMValueMap(offset,
                     pag->getGNode(id));
         }
@@ -141,11 +141,11 @@ void SVFIRBuilder::handleExtCall(const CallBase* cs, const Function* callee)
     {
         u32_t arg_pos = LLVMUtil::getHeapAllocHoldingArgPosition(callee);
         const SVFLLVMValue* arg = llvmModuleSet()->getSVFValue(cs->getArgOperand(arg_pos));
-        if (arg->getType()->isPointerTy())
+        if (cs->getArgOperand(arg_pos)->getType()->isPointerTy())
         {
             NodeID vnArg = llvmModuleSet()->getValueNode(arg);
             NodeID dummy = pag->addDummyValNode();
-            NodeID obj = pag->addDummyObjNode(arg->getType());
+            NodeID obj = pag->addDummyObjNode(llvmModuleSet()->getSVFType(cs->getArgOperand(arg_pos)->getType()));
             if (vnArg && dummy && obj)
             {
                 addAddrWithHeapSz(obj, dummy, cs);

@@ -670,7 +670,7 @@ ObjTypeInfo* SymbolTableBuilder::createObjTypeInfo(const Value* val)
     {
         writeWrnMsg("try to create an object with a non-pointer type.");
         writeWrnMsg(val->getName().str());
-        writeWrnMsg("(" + llvmModuleSet()->getSVFValue(val)->getSourceLoc() + ")");
+        writeWrnMsg("(" + getSourceLoc(val) + ")");
         if (isConstantObjSym(val))
         {
             ObjTypeInfo* typeInfo = new ObjTypeInfo(

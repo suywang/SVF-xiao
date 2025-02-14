@@ -747,7 +747,7 @@ std::string SVFLLVMValue::toString() const
         rawstr << " " << *llvmVal << " ";
     else
         rawstr << " No llvmVal found";
-    rawstr << this->getSourceLoc();
+    rawstr << LLVMUtil::getSourceLoc(llvmVal);
     return rawstr.str();
 }
 

@@ -405,52 +405,52 @@ void SVFIRBuilder::initialiseBaseObjVars()
         else if (LLVMUtil::isHeapObj(llvmValue))
         {
             NodeID id = llvmModuleSet()->getObjectNode(iter->first);
-            pag->addHeapObjNode(iter->second, pag->getObjTypeInfo(id), iter->first->getType(), icfgNode);
+            pag->addHeapObjNode(iter->second, pag->getObjTypeInfo(id), llvmModuleSet()->getSVFType(llvmValue->getType()), icfgNode);
         }
         // Check if the value is an alloca instruction and add a stack object node
         else if (LLVMUtil::isStackObj(llvmValue))
         {
             NodeID id = llvmModuleSet()->getObjectNode(iter->first);
-            pag->addStackObjNode(iter->second, pag->getObjTypeInfo(id), iter->first->getType(), icfgNode);
+            pag->addStackObjNode(iter->second, pag->getObjTypeInfo(id), llvmModuleSet()->getSVFType(llvmValue->getType()), icfgNode);
         }
         else if (auto fpValue = SVFUtil::dyn_cast<ConstantFP>(llvmValue))
         {
             NodeID id = llvmModuleSet()->getObjectNode(iter->first);
-            pag->addConstantFPObjNode(iter->second, pag->getObjTypeInfo(id),  LLVMUtil::getDoubleValue(fpValue), iter->first->getType(), icfgNode);
+            pag->addConstantFPObjNode(iter->second, pag->getObjTypeInfo(id),  LLVMUtil::getDoubleValue(fpValue), llvmModuleSet()->getSVFType(llvmValue->getType()), icfgNode);
         }
         else if (auto intValue = SVFUtil::dyn_cast<ConstantInt>(llvmValue))
         {
             NodeID id = llvmModuleSet()->getObjectNode(iter->first);
-            pag->addConstantIntObjNode(iter->second, pag->getObjTypeInfo(id), LLVMUtil::getIntegerValue(intValue), iter->first->getType(), icfgNode);
+            pag->addConstantIntObjNode(iter->second, pag->getObjTypeInfo(id), LLVMUtil::getIntegerValue(intValue), llvmModuleSet()->getSVFType(llvmValue->getType()), icfgNode);
         }
         else if (SVFUtil::isa<ConstantPointerNull>(llvmValue))
         {
             NodeID id = llvmModuleSet()->getObjectNode(iter->first);
-            pag->addConstantNullPtrObjNode(iter->second, pag->getObjTypeInfo(id), iter->first->getType(), icfgNode);
+            pag->addConstantNullPtrObjNode(iter->second, pag->getObjTypeInfo(id), llvmModuleSet()->getSVFType(llvmValue->getType()), icfgNode);
         }
         else if (SVFUtil::isa<GlobalValue>(llvmValue))
         {
             NodeID id = llvmModuleSet()->getObjectNode(iter->first);
             pag->addGlobalObjNode(iter->second,
                                   pag->getObjTypeInfo(id),
-                                  iter->first->getType(), icfgNode);
+                                  llvmModuleSet()->getSVFType(llvmValue->getType()), icfgNode);
         }
         else if (SVFUtil::isa<ConstantData, MetadataAsValue, BlockAddress>(llvmValue))
         {
             NodeID id = llvmModuleSet()->getObjectNode(iter->first);
-            pag->addConstantDataObjNode(iter->second, pag->getObjTypeInfo(id), iter->first->getType(), icfgNode);
+            pag->addConstantDataObjNode(iter->second, pag->getObjTypeInfo(id), llvmModuleSet()->getSVFType(llvmValue->getType()), icfgNode);
         }
         else if (SVFUtil::isa<ConstantAggregate>(llvmValue))
         {
             NodeID id = llvmModuleSet()->getObjectNode(iter->first);
-            pag->addConstantAggObjNode(iter->second, pag->getObjTypeInfo(id), iter->first->getType(), icfgNode);
+            pag->addConstantAggObjNode(iter->second, pag->getObjTypeInfo(id), llvmModuleSet()->getSVFType(llvmValue->getType()), icfgNode);
         }
         // Add a generic object node for other types of values
         else
         {
             NodeID id = llvmModuleSet()->getObjectNode(iter->first);
             pag->addObjNode(iter->second,
-                            pag->getObjTypeInfo(id), iter->first->getType(), icfgNode);
+                            pag->getObjTypeInfo(id), llvmModuleSet()->getSVFType(llvmValue->getType()), icfgNode);
         }
         llvmModuleSet()->addToSVFVar2LLVMValueMap(llvmValue, pag->getGNode(iter->second));
     }
@@ -486,45 +486,45 @@ void SVFIRBuilder::initialiseValVars()
         if (const Function* func = SVFUtil::dyn_cast<Function>(llvmValue))
         {
             // add value node representing the function
-            pag->addFunValNode(iter->second, icfgNode, llvmModuleSet()->getFunObjVar(func), iter->first->getType());
+            pag->addFunValNode(iter->second, icfgNode, llvmModuleSet()->getFunObjVar(func), llvmModuleSet()->getSVFType(llvmValue->getType()));
         }
         else if (auto argval = SVFUtil::dyn_cast<Argument>(llvmValue))
         {
             pag->addArgValNode(
                 iter->second, argval->getArgNo(), icfgNode,
-                llvmModuleSet()->getFunObjVar(argval->getParent()),iter->first->getType());
+                llvmModuleSet()->getFunObjVar(argval->getParent()),llvmModuleSet()->getSVFType(llvmValue->getType()));
             if (!argval->hasName())
                 pag->getGNode(iter->second)->setName("arg_" + std::to_string(argval->getArgNo()));
         }
         else if (auto fpValue = SVFUtil::dyn_cast<ConstantFP>(llvmValue))
         {
-            pag->addConstantFPValNode(iter->second, LLVMUtil::getDoubleValue(fpValue), icfgNode, iter->first->getType());
+            pag->addConstantFPValNode(iter->second, LLVMUtil::getDoubleValue(fpValue), icfgNode, llvmModuleSet()->getSVFType(llvmValue->getType()));
         }
         else if (auto intValue = SVFUtil::dyn_cast<ConstantInt>(llvmValue))
         {
-            pag->addConstantIntValNode(iter->second, LLVMUtil::getIntegerValue(intValue), icfgNode, iter->first->getType());
+            pag->addConstantIntValNode(iter->second, LLVMUtil::getIntegerValue(intValue), icfgNode, llvmModuleSet()->getSVFType(llvmValue->getType()));
         }
         else if (SVFUtil::isa<ConstantPointerNull>(llvmValue))
         {
-            pag->addConstantNullPtrValNode(iter->second, icfgNode, iter->first->getType());
+            pag->addConstantNullPtrValNode(iter->second, icfgNode, llvmModuleSet()->getSVFType(llvmValue->getType()));
         }
         else if (SVFUtil::isa<GlobalValue>(llvmValue))
         {
             pag->addGlobalValNode(iter->second, icfgNode,
-                                  iter->first->getType());
+                                  llvmModuleSet()->getSVFType(llvmValue->getType()));
         }
         else if (SVFUtil::isa<ConstantData, MetadataAsValue, BlockAddress>(llvmValue))
         {
-            pag->addConstantDataValNode(iter->second, icfgNode, iter->first->getType());
+            pag->addConstantDataValNode(iter->second, icfgNode, llvmModuleSet()->getSVFType(llvmValue->getType()));
         }
         else if (SVFUtil::isa<ConstantAggregate>(llvmValue))
         {
-            pag->addConstantAggValNode(iter->second, icfgNode, iter->first->getType());
+            pag->addConstantAggValNode(iter->second, icfgNode, llvmModuleSet()->getSVFType(llvmValue->getType()));
         }
         else
         {
             // Add value node to PAG
-            pag->addValNode(iter->second, iter->first->getType(), icfgNode);
+            pag->addValNode(iter->second, llvmModuleSet()->getSVFType(llvmValue->getType()), icfgNode);
         }
         llvmModuleSet()->addToSVFVar2LLVMValueMap(llvmValue,
                 pag->getGNode(iter->second));
