@@ -212,7 +212,7 @@ public:
     //@}
 
     typedef GenericNode<SVFVar,SVFStmt>::GEdgeSetTy SVFStmtSetTy;
-    typedef Map<EdgeID, SVFStmtSetTy> PAGEdgeToSetMapTy;
+    typedef Map<GEdgeKind, SVFStmtSetTy> PAGEdgeToSetMapTy;
     typedef PAGEdgeToSetMapTy KindToSVFStmtMapTy;
     typedef SVFStmtSetTy PAGEdgeSetTy;
 
