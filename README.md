@@ -44,7 +44,10 @@
 
 <p>We release the SVF source code with the hope of benefiting the open-source community. You are kindly requested to acknowledge usage of the tool by referring to or citing relevant publications above. </p>
 
-<b>SVF</b>'s doxygen document is available [here](https://svf-tools.github.io/SVF-doxygen/html).
+
+<b>SVF</b>'s doxygen document is available [here](https://svf-tools.github.io/SVF-doxygen/html). 
+
+DeepWiki: [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/jumormt/SVF-xiao)
 
 <br />
 
